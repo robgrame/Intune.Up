@@ -28,11 +28,11 @@ public sealed class CollectFunction
     {
         _logger = logger;
         _certValidator = new CertificateValidator(
-            configuration["ALLOWED_ISSUER_THUMBPRINTS"],
-            configuration["REQUIRED_CERT_SUBJECT"],
-            string.Equals(configuration["CHECK_CERT_REVOCATION"], "true", StringComparison.OrdinalIgnoreCase),
-            configuration["REQUIRED_CHAIN_SUBJECTS"]);
-        var queueName = configuration["SERVICEBUS_QUEUE_NAME"] ?? "device-telemetry";
+            configuration["IntuneUp:Security:AllowedIssuerThumbprints"],
+            configuration["IntuneUp:Security:RequiredCertSubject"],
+            string.Equals(configuration["IntuneUp:Security:CheckCertRevocation"], "true", StringComparison.OrdinalIgnoreCase),
+            configuration["IntuneUp:Security:RequiredChainSubjects"]);
+        var queueName = configuration["IntuneUp:ServiceBus:QueueName"] ?? "device-telemetry";
         _sender = serviceBusClient.CreateSender(queueName);
         _region = configuration["REGION_NAME"] ?? "unknown";
     }

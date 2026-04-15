@@ -28,14 +28,14 @@ public sealed class ProcessorFunction
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
-        _workspaceId = configuration["LOG_ANALYTICS_WORKSPACE_ID"] ?? throw new InvalidOperationException("LOG_ANALYTICS_WORKSPACE_ID not set");
-        _sharedKey = configuration["LOG_ANALYTICS_SHARED_KEY"] ?? throw new InvalidOperationException("LOG_ANALYTICS_SHARED_KEY not set");
-        _tablePrefix = configuration["LOG_TABLE_PREFIX"] ?? "IntuneUp";
+        _workspaceId = configuration["IntuneUp:LogAnalytics:WorkspaceId"] ?? throw new InvalidOperationException("IntuneUp:LogAnalytics:WorkspaceId not set");
+        _sharedKey = configuration["IntuneUp:LogAnalytics:SharedKey"] ?? throw new InvalidOperationException("IntuneUp:LogAnalytics:SharedKey not set");
+        _tablePrefix = configuration["IntuneUp:LogAnalytics:TablePrefix"] ?? "IntuneUp";
     }
 
     [Function("Processor")]
     public async Task Run(
-        [ServiceBusTrigger("%SERVICEBUS_QUEUE_NAME%", Connection = "SERVICEBUS_CONNECTION")]
+        [ServiceBusTrigger("%IntuneUp__ServiceBus__QueueName%", Connection = "IntuneUp__ServiceBus__Connection")]
         ServiceBusReceivedMessage message)
     {
         var payload = JsonSerializer.Deserialize<EnrichedTelemetryMessage>(message.Body);

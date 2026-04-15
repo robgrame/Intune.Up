@@ -89,3 +89,22 @@ resource cfgRefIssuerThumbs 'Microsoft.AppConfiguration/configurationStores/keyV
     contentType: 'application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8'
   }
 }
+
+// Non-secret security config (plain values in App Config)
+resource cfgCheckRevocation 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:Security:CheckCertRevocation'
+  properties: { value: 'false' }
+}
+
+resource cfgRequiredCertSubject 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:Security:RequiredCertSubject'
+  properties: { value: '' }
+}
+
+resource cfgRequiredChainSubjects 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:Security:RequiredChainSubjects'
+  properties: { value: '' }
+}

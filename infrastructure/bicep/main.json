@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "3080434528147315523"
+      "templateHash": "10193036905906954463"
     }
   },
   "parameters": {
@@ -446,18 +446,6 @@
           "extraAppSettings": {
             "value": [
               {
-                "name": "ALLOWED_ISSUER_THUMBPRINTS",
-                "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/AllowedIssuerThumbprints)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
-              },
-              {
-                "name": "SERVICEBUS_CONNECTION",
-                "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/ServiceBusConnection)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
-              },
-              {
-                "name": "SERVICEBUS_QUEUE_NAME",
-                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
-              },
-              {
                 "name": "APPCONFIG_ENDPOINT",
                 "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigEndpoint.value]"
               }
@@ -655,8 +643,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'app-configuration')]",
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
-        "[resourceId('Microsoft.Resources/deployments', 'service-bus')]"
+        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
       ]
     },
     {
@@ -687,28 +674,16 @@
           "extraAppSettings": {
             "value": [
               {
-                "name": "LOG_ANALYTICS_WORKSPACE_ID",
-                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'log-analytics'), '2025-04-01').outputs.workspaceId.value]"
+                "name": "APPCONFIG_ENDPOINT",
+                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigEndpoint.value]"
               },
               {
-                "name": "LOG_ANALYTICS_SHARED_KEY",
-                "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/LogAnalyticsSharedKey)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
-              },
-              {
-                "name": "LOG_TABLE_PREFIX",
-                "value": "IntuneUp"
-              },
-              {
-                "name": "SERVICEBUS_CONNECTION",
+                "name": "IntuneUp__ServiceBus__Connection",
                 "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/ServiceBusConnection)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
               },
               {
-                "name": "SERVICEBUS_QUEUE_NAME",
+                "name": "IntuneUp__ServiceBus__QueueName",
                 "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
-              },
-              {
-                "name": "APPCONFIG_ENDPOINT",
-                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigEndpoint.value]"
               }
             ]
           }
@@ -905,7 +880,6 @@
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'app-configuration')]",
         "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
-        "[resourceId('Microsoft.Resources/deployments', 'log-analytics')]",
         "[resourceId('Microsoft.Resources/deployments', 'service-bus')]"
       ]
     },
@@ -1098,7 +1072,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "14949893409330442906"
+              "templateHash": "10672918948743575027"
             }
           },
           "parameters": {
@@ -1213,6 +1187,30 @@
               "dependsOn": [
                 "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'AllowedIssuerThumbprints')]"
               ]
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:Security:CheckCertRevocation')]",
+              "properties": {
+                "value": "false"
+              }
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:Security:RequiredCertSubject')]",
+              "properties": {
+                "value": ""
+              }
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:Security:RequiredChainSubjects')]",
+              "properties": {
+                "value": ""
+              }
             }
           ]
         }

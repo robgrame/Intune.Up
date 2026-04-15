@@ -90,18 +90,6 @@ module functionHttp 'function-app.bicep' = {
     clientCertEnabled: true
     extraAppSettings: [
       {
-        name: 'ALLOWED_ISSUER_THUMBPRINTS'
-        value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/AllowedIssuerThumbprints)'
-      }
-      {
-        name: 'SERVICEBUS_CONNECTION'
-        value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/ServiceBusConnection)'
-      }
-      {
-        name: 'SERVICEBUS_QUEUE_NAME'
-        value: serviceBus.outputs.queueName
-      }
-      {
         name: 'APPCONFIG_ENDPOINT'
         value: appConfig.outputs.appConfigEndpoint
       }
@@ -119,28 +107,18 @@ module functionSb 'function-app.bicep' = {
     keyVaultUri: keyVault.outputs.keyVaultUri
     extraAppSettings: [
       {
-        name: 'LOG_ANALYTICS_WORKSPACE_ID'
-        value: logAnalytics.outputs.workspaceId
+        name: 'APPCONFIG_ENDPOINT'
+        value: appConfig.outputs.appConfigEndpoint
       }
       {
-        name: 'LOG_ANALYTICS_SHARED_KEY'
-        value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/LogAnalyticsSharedKey)'
-      }
-      {
-        name: 'LOG_TABLE_PREFIX'
-        value: 'IntuneUp'
-      }
-      {
-        name: 'SERVICEBUS_CONNECTION'
+        // Required at runtime startup for SB trigger binding (before DI/AppConfig loads)
+        name: 'IntuneUp__ServiceBus__Connection'
         value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/ServiceBusConnection)'
       }
       {
-        name: 'SERVICEBUS_QUEUE_NAME'
+        // Required at runtime startup for SB trigger binding
+        name: 'IntuneUp__ServiceBus__QueueName'
         value: serviceBus.outputs.queueName
-      }
-      {
-        name: 'APPCONFIG_ENDPOINT'
-        value: appConfig.outputs.appConfigEndpoint
       }
     ]
   }
