@@ -3,6 +3,7 @@
     Remediation – Cleanup Windows Temp Folders
 .DESCRIPTION
     Elimina il contenuto delle cartelle temporanee Windows e svuota il Cestino.
+    Considera solo i file più vecchi di MinAgeDays giorni.
     Idempotente. Non elimina le cartelle stesse, solo il contenuto.
     File con estensioni protette (.docx, .xlsx, .csv, .pptx) vengono ignorati.
     File in uso vengono ignorati senza bloccare l'esecuzione.
@@ -12,6 +13,8 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 $EventSource        = "IntuneUp"
+$MinAgeDays         = 7
+$AgeThreshold       = (Get-Date).AddDays(-$MinAgeDays)
 $ExcludedExtensions = @(".docx", ".xlsx", ".csv", ".pptx")
 
 function Write-IntuneLog {
@@ -55,7 +58,7 @@ foreach ($path in (Resolve-FolderPaths)) {
 
     # Elimina prima i file (rispettando le esclusioni), poi le directory vuote
     $files = Get-ChildItem -Path $path -Recurse -Force -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Extension -notin $ExcludedExtensions }
+        Where-Object { $_.Extension -notin $ExcludedExtensions -and $_.LastWriteTime -lt $AgeThreshold }
 
     foreach ($file in $files) {
         try {
