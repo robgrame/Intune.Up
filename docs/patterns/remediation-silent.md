@@ -17,9 +17,9 @@ remediations/silent/{use-case}/
 
 ```
 <CLIENTE>-<CATEGORIA>-<DESCRIZIONE>
-es: ENEL-SILENT-WMIRepair
-    ENEL-SILENT-CleanupTemp
-    ENEL-SILENT-SCCMAgentFix
+es: INTUNEUP-SILENT-WMIRepair
+    INTUNEUP-SILENT-CleanupTemp
+    INTUNEUP-SILENT-SCCMAgentFix
 ```
 
 ## Tagging Intune (Description field)

@@ -38,9 +38,9 @@ if (Test-Path $manualTriggerFlag) {
 ## Naming convention (aiuta il Service Desk a trovare le remediation)
 
 ```
-ENEL-MANUAL-<DESCRIZIONE>    # remediation solo manuali
-ENEL-SILENT-<DESCRIZIONE>    # remediation automatiche (usabili anche manualmente)
-ENEL-UI-<DESCRIZIONE>        # remediation con interazione utente
+INTUNEUP-MANUAL-<DESCRIZIONE>    # remediation solo manuali
+INTUNEUP-SILENT-<DESCRIZIONE>    # remediation automatiche (usabili anche manualmente)
+INTUNEUP-UI-<DESCRIZIONE>        # remediation con interazione utente
 ```
 
 ## Tagging / categorizzazione

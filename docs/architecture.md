@@ -2,8 +2,7 @@
 
 ## Contesto
 
-ENEL utilizza Nexthink per remediation automatiche, raccolta dati custom, campagne utente e azioni Service Desk.
-Obiettivo: replicare e superare queste funzionalità con **Microsoft Intune + Azure**.
+Framework for migrating device management capabilities (remediations, data collection, user campaigns, Service Desk actions) from third-party agents to **Microsoft Intune + Azure**.
 
 ---
 
@@ -14,7 +13,7 @@ Obiettivo: replicare e superare queste funzionalità con **Microsoft Intune + Az
 | 1 | Collettore dati | Azure Function HTTP trigger (entry) → Service Bus → Azure Function SB trigger (processor) |
 | 2 | Auth client→collettore | Certificato client X.509 (thumbprint validato dalla HTTP Function) |
 | 3 | Notifica utente | Due template: BurntToast (PS module) + XML Toast nativo. Il cliente sceglie. |
-| 4 | AI integration | Da analizzare con bot Teams esistente ENEL (Bot Framework / Azure Bot Service?) |
+| 4 | AI integration | Da analizzare con bot Teams esistente (Bot Framework / Azure Bot Service?) |
 
 ---
 
@@ -114,7 +113,7 @@ Obiettivo: replicare e superare queste funzionalità con **Microsoft Intune + Az
 
 ## AI Assistant (futuro)
 
-ENEL dispone di un bot AI già deployato su Teams.
+L'organizzazione dispone di un bot AI già deployato su Teams.
 Da investigare:
 - Tecnologia del bot (Bot Framework? Power Virtual Agents? Azure OpenAI + bot?)
 - Supporto per tool/function calling o plugin

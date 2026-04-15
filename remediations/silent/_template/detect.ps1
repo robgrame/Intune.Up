@@ -6,7 +6,7 @@
     Exit 0 = compliant (remediation non eseguita)
     Exit 1 = non compliant (remediation eseguita)
 .NOTES
-    Naming:  ENEL-SILENT-<UseCase>
+    Naming:  INTUNEUP-SILENT-<UseCase>
     Context: SYSTEM
     Replace: TODO_USECASE con il nome del use case
 #>

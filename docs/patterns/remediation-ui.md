@@ -66,8 +66,8 @@ Register-ScheduledTask -TaskName "IntuneUp-Notify-$([guid]::NewGuid())" `
 ## Naming convention
 
 ```
-ENEL-UI-<DESCRIZIONE>
-es: ENEL-UI-RebootReminder
-    ENEL-UI-OneDriveRestart
-    ENEL-UI-PasswordReminder
+INTUNEUP-UI-<DESCRIZIONE>
+es: INTUNEUP-UI-RebootReminder
+    INTUNEUP-UI-OneDriveRestart
+    INTUNEUP-UI-PasswordReminder
 ```

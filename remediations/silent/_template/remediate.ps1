@@ -6,7 +6,7 @@
     Exit 0 = successo
     Exit 1 = fallimento
 .NOTES
-    Naming:  ENEL-SILENT-<UseCase>
+    Naming:  INTUNEUP-SILENT-<UseCase>
     Context: SYSTEM
     Replace: TODO_USECASE con il nome del use case
 #>

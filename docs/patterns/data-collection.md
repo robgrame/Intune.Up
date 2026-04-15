@@ -64,7 +64,7 @@ data-collection/collector/
 {
   "DeviceId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "DeviceName": "HOSTNAME",
-  "UPN": "user@enel.com",
+  "UPN": "user@contoso.com",
   "Timestamp": "2026-04-15T09:00:00Z",
   "UseCase": "BitLockerStatus",
   "Data": {

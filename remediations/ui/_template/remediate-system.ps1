@@ -7,7 +7,7 @@
     2. Crea uno Scheduled Task one-time nel contesto dell'utente corrente
        per eseguire notify-user.ps1
 .NOTES
-    Naming:  ENEL-UI-<UseCase>
+    Naming:  INTUNEUP-UI-<UseCase>
     Context: SYSTEM
     Richiede: notify-user.ps1 (o .burnttoast.ps1) distribuito sul client
               Percorso consigliato: C:\ProgramData\IntuneUp\notify\

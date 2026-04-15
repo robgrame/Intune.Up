@@ -6,7 +6,7 @@
     Exit 0 = compliant
     Exit 1 = non compliant → esegue remediate-system.ps1
 .NOTES
-    Naming:  ENEL-UI-<UseCase>
+    Naming:  INTUNEUP-UI-<UseCase>
     Context: SYSTEM
 #>
 
