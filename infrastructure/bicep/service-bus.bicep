@@ -12,13 +12,11 @@ resource namespace 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
   location: location
   tags: tags
   sku: {
-    name: 'Premium'
-    tier: 'Premium'
-    capacity: 1
+    name: 'Standard'
+    tier: 'Standard'
   }
   properties: {
     minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Disabled'
   }
 }
 

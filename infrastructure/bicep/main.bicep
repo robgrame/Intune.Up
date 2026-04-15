@@ -37,16 +37,10 @@ var tags = {
   managedBy: 'bicep'
 }
 
-// ---- Step 1: Network + Core resources ----
-
-module network 'network.bicep' = {
-  name: 'network'
-  params: {
-    name: 'vnet-${baseName}-${environment}'
-    location: location
-    tags: tags
-  }
-}
+// ---- Step 1: Core resources ----
+// Note: VNet + Private Endpoints available in network.bicep + private-endpoints.bicep
+// for enterprise/production deployments (requires SB Premium + AppConfig Standard).
+// App Gateway WAF v2 available in app-gateway.bicep (separate deploy).
 
 module logAnalytics 'log-analytics.bicep' = {
   name: 'log-analytics'
@@ -106,7 +100,6 @@ module functionHttp 'function-app.bicep' = {
     tags: tags
     keyVaultUri: keyVault.outputs.keyVaultUri
     clientCertEnabled: true
-    vnetIntegrationSubnetId: network.outputs.functionSubnetId
     extraAppSettings: [
       {
         name: 'APPCONFIG_ENDPOINT'
@@ -124,7 +117,6 @@ module functionSb 'function-app.bicep' = {
     location: location
     tags: tags
     keyVaultUri: keyVault.outputs.keyVaultUri
-    vnetIntegrationSubnetId: network.outputs.functionSubnetId
     extraAppSettings: [
       {
         name: 'APPCONFIG_ENDPOINT'
@@ -177,28 +169,6 @@ module configSeed 'config-seed.bicep' = {
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
     allowedIssuerThumbprints: allowedIssuerThumbprints
-  }
-}
-
-// ---- Step 5: Private Endpoints (all backend resources behind VNet) ----
-
-module privateEndpoints 'private-endpoints.bicep' = {
-  name: 'private-endpoints'
-  params: {
-    location: location
-    tags: tags
-    privateEndpointSubnetId: network.outputs.privateEndpointSubnetId
-    privateDnsZoneIds: network.outputs.privateDnsZoneIds
-    serviceBusId: serviceBus.outputs.namespaceId
-    serviceBusName: serviceBus.outputs.namespaceName
-    keyVaultId: keyVault.outputs.keyVaultId
-    keyVaultName: keyVault.outputs.keyVaultName
-    appConfigId: appConfig.outputs.appConfigId
-    appConfigName: appConfig.outputs.appConfigName
-    storageAccountHttpId: functionHttp.outputs.storageAccountId
-    storageAccountHttpName: functionHttp.outputs.storageAccountName
-    storageAccountSbId: functionSb.outputs.storageAccountId
-    storageAccountSbName: functionSb.outputs.storageAccountName
   }
 }
 
