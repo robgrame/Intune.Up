@@ -1,22 +1,22 @@
 ﻿<#
 .SYNOPSIS
-    Template - Remediation SYSTEM: azione tecnica + creazione Scheduled Task per notifica utente
+    Template - Remediation SYSTEM: azione tecnica + notifica utente (self-contained)
 .DESCRIPTION
     Eseguito in contesto SYSTEM da Intune.
     1. Esegue l'azione tecnica (se necessaria)
-    2. Crea uno Scheduled Task one-time nel contesto dell'utente corrente
-       per eseguire notify-user.ps1
+    2. Genera lo script di notifica on-the-fly (embedded in here-string)
+    3. Crea uno Scheduled Task one-time nel contesto dell'utente corrente
+    Nessun prerequisito: deploy su Intune con solo detect.ps1 + remediate-system.ps1
 .NOTES
     Naming:  INTUNEUP-UI-<UseCase>
     Context: SYSTEM
-    Richiede: notify-user.ps1 (o .burnttoast.ps1) distribuito sul client
-              Percorso consigliato: C:\ProgramData\IntuneUp\notify\
 #>
 
 $ErrorActionPreference = "Stop"
-$UseCase       = "TODO_USECASE"
-$NotifyScriptPath = "C:\ProgramData\IntuneUp\notify\$UseCase\notify-user.ps1"
-$EventSource   = "IntuneUp"
+$UseCase          = "TODO_USECASE"
+$NotifyDir        = "C:\ProgramData\IntuneUp\notify\$UseCase"
+$NotifyScriptPath = "$NotifyDir\notify-user.ps1"
+$EventSource      = "IntuneUp"
 
 function Write-IntuneLog {
     param([string]$Message, [string]$EntryType = "Information")

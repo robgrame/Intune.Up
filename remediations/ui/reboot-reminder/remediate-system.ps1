@@ -1,17 +1,18 @@
 ﻿<#
 .SYNOPSIS
-    Remediation SYSTEM - Reboot Reminder: crea Scheduled Task per notifica utente
+    Remediation SYSTEM - Reboot Reminder (self-contained)
 .DESCRIPTION
-    Non esegue azione tecnica immediata.
-    Calcola i giorni dall'ultimo reboot e crea uno Scheduled Task
-    nel contesto utente per mostrare la notifica di richiesta reboot.
+    Calcola i giorni dall'ultimo reboot, genera lo script di notifica
+    on-the-fly e crea uno Scheduled Task nel contesto utente.
+    Nessun prerequisito: tutto e' embedded in questo singolo script.
     Intune Remediation: INTUNEUP-UI-RebootReminder
     Context: SYSTEM
 #>
 
 $ErrorActionPreference = "Stop"
 $UseCase         = "RebootReminder"
-$NotifyScriptPath = "C:\ProgramData\IntuneUp\notify\$UseCase\notify-user.ps1"
+$NotifyDir       = "C:\ProgramData\IntuneUp\notify\$UseCase"
+$NotifyScriptPath = "$NotifyDir\notify-user.ps1"
 $EventSource     = "IntuneUp"
 
 function Write-IntuneLog {
@@ -30,26 +31,87 @@ function Get-CurrentInteractiveUser {
         Select-Object -First 1).UserName
 }
 
+# Embedded notification script (written to disk, executed in USER context)
+$notifyScriptContent = @'
+$UseCase  = "RebootReminder"
+$DataFile = "C:\ProgramData\IntuneUp\notify\$UseCase\data.json"
+$AppId    = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
+
+$daysSince = 14
+try {
+    if (Test-Path $DataFile) {
+        $data = Get-Content $DataFile -Raw | ConvertFrom-Json
+        $daysSince = $data.DaysSinceReboot
+    }
+} catch {}
+
+$title   = "Riavvio richiesto"
+$message = "Il tuo PC non viene riavviato da $daysSince giorni. Il riavvio e' necessario per installare aggiornamenti e migliorare le prestazioni."
+
+# Try BurntToast first, fallback to native XML toast
+$useBurntToast = $false
+try {
+    if (Get-Module -ListAvailable -Name BurntToast -ErrorAction SilentlyContinue) {
+        Import-Module BurntToast -ErrorAction Stop
+        $useBurntToast = $true
+    }
+} catch {}
+
+if ($useBurntToast) {
+    try {
+        $btn1 = New-BTButton -Content "Riavvia ora"              -Arguments "restart-now"
+        $btn2 = New-BTButton -Content "Ricordamelo piu tardi"    -Arguments "later"
+        New-BurntToastNotification -Text $title, $message -Button $btn1, $btn2
+        exit 0
+    } catch {}
+}
+
+# Fallback: native Windows Toast XML
+try {
+    [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+    [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+
+    $toastXml = @"
+<toast scenario="reminder" activationType="foreground">
+  <visual>
+    <binding template="ToastGeneric">
+      <text>$title</text>
+      <text>$message</text>
+    </binding>
+  </visual>
+  <actions>
+    <action content="Riavvia ora" arguments="restart-now" activationType="foreground"/>
+    <action content="Ricordamelo piu tardi" arguments="later" activationType="foreground"/>
+  </actions>
+</toast>
+"@
+    $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+    $xml.LoadXml($toastXml)
+    $toast    = [Windows.UI.Notifications.ToastNotification]::new($xml)
+    $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($AppId)
+    $notifier.Show($toast)
+    exit 0
+} catch {
+    exit 1
+}
+'@
+
 try {
     $lastBoot  = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
     $daysSince = [math]::Round(((Get-Date) - $lastBoot).TotalDays, 0)
 
-    # Scrivi i giorni in un file temporaneo leggibile dallo script utente
-    $dataFile = "C:\ProgramData\IntuneUp\notify\$UseCase\data.json"
-    $dataDir  = Split-Path $dataFile
-    if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir -Force | Out-Null }
-    @{ DaysSinceReboot = $daysSince } | ConvertTo-Json | Set-Content -Path $dataFile -Force
+    # Crea directory, scrivi lo script di notifica + dati
+    if (-not (Test-Path $NotifyDir)) { New-Item -ItemType Directory -Path $NotifyDir -Force | Out-Null }
+    @{ DaysSinceReboot = $daysSince } | ConvertTo-Json | Set-Content -Path "$NotifyDir\data.json" -Force -Encoding UTF8
+    Set-Content -Path $NotifyScriptPath -Value $notifyScriptContent -Force -Encoding UTF8
 
     $currentUser = Get-CurrentInteractiveUser
     if (-not $currentUser) {
         Write-IntuneLog "No interactive user found, skipping notification" -EntryType "Warning"
         exit 0
     }
-    if (-not (Test-Path $NotifyScriptPath)) {
-        Write-IntuneLog "Notify script not found at '$NotifyScriptPath'" -EntryType "Warning"
-        exit 0
-    }
 
+    # Crea Scheduled Task nel contesto utente
     $taskName  = "IntuneUp-$UseCase-$([guid]::NewGuid().ToString('N').Substring(0,8))"
     $action    = New-ScheduledTaskAction -Execute "powershell.exe" `
                      -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$NotifyScriptPath`""
