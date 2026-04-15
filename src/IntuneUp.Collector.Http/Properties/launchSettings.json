@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "IntuneUp.Collector.Http": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7274",
+      "launchBrowser": false
+    }
+  }
+}
