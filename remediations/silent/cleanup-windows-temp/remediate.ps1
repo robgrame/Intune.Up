@@ -63,7 +63,7 @@ foreach ($path in (Resolve-FolderPaths)) {
     foreach ($file in $files) {
         try {
             $freedBytes += $file.Length
-            Remove-Item -Path $file.FullName -Force -ErrorAction Stop
+            Remove-Item -Path $file.FullName -Force -Confirm:$false -ErrorAction Stop
             $totalDeleted++
         } catch {
             $totalFailed++
@@ -74,7 +74,7 @@ foreach ($path in (Resolve-FolderPaths)) {
     Get-ChildItem -Path $path -Recurse -Force -Directory -ErrorAction SilentlyContinue |
         Sort-Object -Property FullName -Descending |
         ForEach-Object {
-            try { Remove-Item -Path $_.FullName -Force -ErrorAction Stop; $totalDeleted++ } catch {}
+            try { Remove-Item -Path $_.FullName -Force -Recurse -Confirm:$false -ErrorAction Stop; $totalDeleted++ } catch {}
         }
 }
 
