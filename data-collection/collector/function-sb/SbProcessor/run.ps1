@@ -52,21 +52,41 @@ function Send-LogAnalyticsData {
 }
 
 # ---------------------------------------------------------------------------
-# Process message
+# Process message (with claim-check support)
 # ---------------------------------------------------------------------------
-try {
-    $payload = $QueueMessage | ConvertFrom-Json -ErrorAction Stop
-} catch {
-    Write-Error "Failed to deserialize Service Bus message: $_"
-    throw   # rethrow -> Service Bus will retry / dead-letter
+$rawMessage = $QueueMessage | ConvertFrom-Json -ErrorAction Stop
+
+# Check if this is a claim-check message
+if ($rawMessage.ClaimCheck -eq $true) {
+    $blobName           = $rawMessage.BlobName
+    $storageAccountName = $env:AzureWebJobsStorage__accountName
+    $containerName      = "claim-check"
+    $blobUri            = "https://$storageAccountName.blob.core.windows.net/$containerName/$blobName"
+
+    $token = (Get-AzAccessToken -ResourceUrl "https://storage.azure.com/").Token
+    $blobContent = Invoke-RestMethod -Uri $blobUri `
+        -Headers @{ Authorization = "Bearer $token"; "x-ms-version" = "2020-10-02" }
+    $payload = $blobContent | ConvertFrom-Json -ErrorAction Stop
+
+    Write-Host "Claim-check: fetched '$blobName'"
+
+    # Cleanup blob
+    try {
+        Invoke-RestMethod -Uri $blobUri -Method Delete `
+            -Headers @{ Authorization = "Bearer $token"; "x-ms-version" = "2020-10-02" } `
+            -ErrorAction SilentlyContinue
+    } catch {}
+} else {
+    $payload = $rawMessage
 }
 
-$workspaceId = $env:LOG_ANALYTICS_WORKSPACE_ID
-$sharedKey   = $env:LOG_ANALYTICS_SHARED_KEY
-$prefix      = $env:LOG_TABLE_PREFIX ?? "IntuneUp"
+# Read config (from App Settings - these are seeded by App Configuration at startup for PS1 runtime)
+$workspaceId = $env:IntuneUp__LogAnalytics__WorkspaceId ?? $env:LOG_ANALYTICS_WORKSPACE_ID
+$sharedKey   = $env:IntuneUp__LogAnalytics__SharedKey ?? $env:LOG_ANALYTICS_SHARED_KEY
+$prefix      = $env:IntuneUp__LogAnalytics__TablePrefix ?? $env:LOG_TABLE_PREFIX ?? "IntuneUp"
 
 if ([string]::IsNullOrEmpty($workspaceId) -or [string]::IsNullOrEmpty($sharedKey)) {
-    throw "Missing Log Analytics configuration (LOG_ANALYTICS_WORKSPACE_ID / LOG_ANALYTICS_SHARED_KEY)"
+    throw "Missing Log Analytics configuration"
 }
 
 # Derive table name from UseCase: "IntuneUp_BitLockerStatus"

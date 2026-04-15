@@ -4,8 +4,8 @@
       "type": "serviceBusTrigger",
       "direction": "in",
       "name": "QueueMessage",
-      "queueName": "%SERVICEBUS_QUEUE_NAME%",
-      "connection": "SERVICEBUS_CONNECTION",
+      "queueName": "%IntuneUp__ServiceBus__QueueName%",
+      "connection": "IntuneUp__ServiceBus__Connection",
       "isSessionsEnabled": false
     }
   ]

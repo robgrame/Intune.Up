@@ -176,21 +176,82 @@ foreach ($field in $requiredFields) {
 # Enrich payload with server-side metadata
 # ---------------------------------------------------------------------------
 $enriched = @{
-    DeviceId      = $payload.DeviceId
-    DeviceName    = $payload.DeviceName
-    UPN           = $payload.UPN
-    UseCase       = $payload.UseCase
-    Data          = $payload.Data
-    ReceivedAt    = (Get-Date).ToUniversalTime().ToString("o")
+    DeviceId       = $payload.DeviceId
+    DeviceName     = $payload.DeviceName
+    UPN            = $payload.UPN
+    UseCase        = $payload.UseCase
+    Data           = $payload.Data
+    ReceivedAt     = (Get-Date).ToUniversalTime().ToString("o")
     FunctionRegion = $env:REGION_NAME ?? "unknown"
 }
 
 # ---------------------------------------------------------------------------
-# Enqueue to Service Bus
+# Enqueue to Service Bus (with claim-check for large payloads)
 # ---------------------------------------------------------------------------
+$ClaimCheckThresholdBytes = 200 * 1024  # 200 KB
 $messageBody = $enriched | ConvertTo-Json -Depth 10 -Compress
+$messageBytes = [System.Text.Encoding]::UTF8.GetBytes($messageBody)
+$messageId = "$($payload.DeviceId)-$($payload.UseCase)-$((Get-Date).Ticks)"
 
-Push-OutputBinding -Name OutputMessage -Value $messageBody
+$sbConnString = $env:IntuneUp__ServiceBus__Connection
+$sbQueueName  = $env:IntuneUp__ServiceBus__QueueName ?? "device-telemetry"
+
+if ($messageBytes.Length -ge $ClaimCheckThresholdBytes) {
+    # Claim-check: upload to blob, send reference in queue
+    $storageAccountName = $env:AzureWebJobsStorage__accountName
+    $containerName      = "claim-check"
+    $blobName           = "$($payload.UseCase)/$(Get-Date -Format 'yyyy/MM/dd')/$messageId.json"
+
+    # Upload to blob using managed identity
+    $blobUri = "https://$storageAccountName.blob.core.windows.net/$containerName/$blobName"
+    $token   = (Get-AzAccessToken -ResourceUrl "https://storage.azure.com/").Token
+    $null    = Invoke-RestMethod -Uri "https://$storageAccountName.blob.core.windows.net/$containerName" `
+        -Method Put -Headers @{ Authorization = "Bearer $token"; "x-ms-version" = "2020-10-02" } `
+        -ErrorAction SilentlyContinue  # create container if needed
+    Invoke-RestMethod -Uri $blobUri -Method Put -Body $messageBytes `
+        -Headers @{
+            Authorization    = "Bearer $token"
+            "x-ms-version"   = "2020-10-02"
+            "x-ms-blob-type" = "BlockBlob"
+            "Content-Type"   = "application/json"
+        }
+
+    # Send claim-check reference to Service Bus
+    $claimRef = @{
+        ClaimCheck = $true
+        BlobName   = $blobName
+        DeviceId   = $enriched.DeviceId
+        DeviceName = $enriched.DeviceName
+        UseCase    = $enriched.UseCase
+        ReceivedAt = $enriched.ReceivedAt
+    } | ConvertTo-Json -Compress
+
+    $sbClient  = [Azure.Messaging.ServiceBus.ServiceBusClient]::new($sbConnString)
+    $sbSender  = $sbClient.CreateSender($sbQueueName)
+    $sbMessage = [Azure.Messaging.ServiceBus.ServiceBusMessage]::new($claimRef)
+    $sbMessage.ContentType = "application/json"
+    $sbMessage.Subject     = $payload.UseCase
+    $sbMessage.MessageId   = $messageId
+    $sbMessage.ApplicationProperties["ClaimCheck"] = $true
+    $sbSender.SendMessageAsync($sbMessage).GetAwaiter().GetResult()
+    $sbSender.DisposeAsync().GetAwaiter().GetResult()
+    $sbClient.DisposeAsync().GetAwaiter().GetResult()
+
+    Write-Host "Claim-check: stored $([math]::Round($messageBytes.Length/1024,1))KB in blob for '$($payload.DeviceName)/$($payload.UseCase)'"
+} else {
+    # Standard: send directly to Service Bus
+    $sbClient  = [Azure.Messaging.ServiceBus.ServiceBusClient]::new($sbConnString)
+    $sbSender  = $sbClient.CreateSender($sbQueueName)
+    $sbMessage = [Azure.Messaging.ServiceBus.ServiceBusMessage]::new($messageBody)
+    $sbMessage.ContentType = "application/json"
+    $sbMessage.Subject     = $payload.UseCase
+    $sbMessage.MessageId   = $messageId
+    $sbSender.SendMessageAsync($sbMessage).GetAwaiter().GetResult()
+    $sbSender.DisposeAsync().GetAwaiter().GetResult()
+    $sbClient.DisposeAsync().GetAwaiter().GetResult()
+
+    Write-Host "Accepted $($messageBytes.Length)B from '$($payload.DeviceName)' use case '$($payload.UseCase)'"
+}
 
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
     StatusCode = [HttpStatusCode]::Accepted
@@ -198,4 +259,4 @@ Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
     Headers    = @{ 'Content-Type' = 'application/json' }
 })
 
-Write-Host "Accepted payload from device '$($payload.DeviceName)' use case '$($payload.UseCase)'"
+Write-Host "Request processed for device '$($payload.DeviceName)'"
