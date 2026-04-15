@@ -9,36 +9,35 @@ Prezzi indicativi West Europe, Pay-As-You-Go. Aprile 2026.
 | Azure Function HTTP | B1 Basic | ~€11 |
 | Azure Function SB | B1 Basic | ~€11 |
 | Storage Account x2 | Standard LRS | ~€2 |
-| Service Bus | Standard | ~€8 |
+| Service Bus | Premium (1 MU) | ~€590 |
 | Log Analytics | Per-GB (5GB free/mese) | ~€0-10 (dipende dal volume) |
 | Key Vault | Standard | ~€0.03/10K ops |
-| App Configuration | Free | €0 |
+| App Configuration | Standard | ~€37 |
 | Automation Account | Basic (500 min free) | ~€0 |
 | VNet + Private Endpoints | 6 endpoints | ~€42 (€7/endpoint/mese) |
 | Private DNS Zones | 6 zone | ~€3 |
-| **Totale** | | **~€77-87/mese** |
+| **Totale** | | **~€693-703/mese** |
 
 ## Con Application Gateway + WAF v2
 
 | Risorsa | SKU | Costo stimato/mese |
 |---------|-----|-------------------|
-| Tutto quanto sopra | | ~€77-87 |
+| Tutto quanto sopra | | ~€693-703 |
 | App Gateway WAF_v2 | 1 istanza, fisso | ~€246 |
 | App Gateway capacity units | Variabile (traffico) | ~€5-15 |
 | Public IP Standard | | ~€3 |
-| **Totale** | | **~€331-351/mese** |
+| **Totale** | | **~€947-967/mese** |
 
 ## Delta
 
-| | Senza App GW | Con App GW + WAF |
+| | Con Private Endpoints | Con PE + App GW |
 |---|---|---|
-| Costo mensile | ~€82 | ~€340 |
-| Delta | - | **+€258/mese** |
+| Costo mensile | ~€698 | ~€960 |
+| Service Bus Premium | Si (richiesto per PE) | Si |
+| App Config Standard | Si (richiesto per PE) | Si |
 | WAF (OWASP 3.2) | No | Si |
 | DDoS L7 | No | Si |
-| Bot protection | No | Si |
-| SSL offloading | No | Si |
-| Costo annuale | ~€984 | ~€4.080 |
+| Costo annuale | ~€8.376 | ~€11.520 |
 
 ## Note
 
