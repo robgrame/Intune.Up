@@ -1,7 +1,10 @@
 ﻿<#
 .SYNOPSIS
-    Azure Function - Service Bus trigger, writes data to Log Analytics.
+    Azure Function - Service Bus trigger, writes data to Log Analytics (PowerShell reference implementation).
 .DESCRIPTION
+    NOTE: This is the PowerShell reference/POC implementation.
+    For production enterprise deployments, use the .NET 10 solution in src/IntuneUp.Collector.ServiceBus.
+
     Consumes messages from the Service Bus queue (produced by the HTTP entry Function),
     normalises them, and writes to a Log Analytics Workspace via the Data Collector API.
 

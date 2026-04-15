@@ -79,8 +79,12 @@ Intune.Up/
 │   │   ├── _template/
 │   │   └── login-information/
 │   └── collector/
-│       ├── function-http/            # Azure Function: HTTP entry point
-│       └── function-sb/              # Azure Function: Service Bus processor
+│       ├── function-http/            # Azure Function: HTTP entry point (PS1 reference)
+│       └── function-sb/              # Azure Function: Service Bus processor (PS1 reference)
+├── src/                              # .NET 10 solution (production)
+│   ├── IntuneUp.Collector.Http/      # HTTP trigger Function (C#)
+│   ├── IntuneUp.Collector.ServiceBus/ # Service Bus trigger Function (C#)
+│   └── IntuneUp.Common/             # Shared models + CertificateValidator
 ├── service-desk/
 │   └── runbooks/
 │       ├── clear-chrome-settings/

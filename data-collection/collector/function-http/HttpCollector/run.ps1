@@ -1,7 +1,10 @@
 ﻿<#
 .SYNOPSIS
-    Azure Function - HTTP trigger entry point for client data collection.
+    Azure Function - HTTP trigger entry point for client data collection (PowerShell reference implementation).
 .DESCRIPTION
+    NOTE: This is the PowerShell reference/POC implementation.
+    For production enterprise deployments, use the .NET 10 solution in src/IntuneUp.Collector.Http.
+
     Receives telemetry payloads from managed devices via HTTPS + client certificate.
     Validates the client certificate thumbprint against an allowlist, enriches the
     payload with server-side metadata, then enqueues to Azure Service Bus.
