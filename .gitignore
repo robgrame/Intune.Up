@@ -33,3 +33,8 @@ desktop.ini
 # Temp
 *.tmp
 *.log
+
+# .NET build output
+bin/
+obj/
+
