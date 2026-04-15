@@ -43,4 +43,6 @@ resource authRule 'Microsoft.ServiceBus/namespaces/authorizationRules@2022-10-01
 
 output namespaceName string = namespace.name
 output queueName string = queue.name
+
+#disable-next-line outputs-should-not-contain-secrets
 output connectionString string = authRule.listKeys().primaryConnectionString

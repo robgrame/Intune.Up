@@ -1,19 +1,27 @@
 // ============================================================
 // Azure Function App (Consumption plan, PowerShell runtime)
+// Uses System-Assigned Managed Identity for all connections:
+//   - Storage: identity-based (no shared key)
+//   - Key Vault: KV references in app settings
 // ============================================================
 
 param name string
 param location string
 param tags object = {}
-param serviceBusConnectionString string
-param queueName string
-param appSettings object = {}
 
-var storageAccountName = replace(toLower('st${name}'), '-', '')
+@description('Key Vault URI for secret references')
+param keyVaultUri string
+
+@description('Extra app settings (name/value pairs)')
+param extraAppSettings array = []
+
+@minLength(3)
+@maxLength(24)
+param storageAccountName string = take(replace(replace(toLower('st${name}'), '-', ''), '_', ''), 24)
 
 // Storage Account (required by Azure Functions)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: take(storageAccountName, 24)
+  name: storageAccountName
   location: location
   tags: tags
   sku: { name: 'Standard_LRS' }
@@ -22,41 +30,80 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
     supportsHttpsTrafficOnly: true
+    allowSharedKeyAccess: false
+    defaultToOAuthAuthentication: true
   }
 }
 
-// App Service Plan (Consumption)
+// Storage Blob Data Owner for the Function App MI
+var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+// Storage Account Contributor (needed for file share creation)
+var storageAccountContributorRoleId = '17d1049b-9a84-46fb-8f53-869881c3d3ab'
+// Storage Queue Data Contributor
+var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+// Storage File Data Privileged Contributor  
+var storageFileDataPrivContribRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
+
+resource storageBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageBlobDataOwnerRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource storageAccountContribRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageAccountContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageAccountContributorRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource storageQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageQueueDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource storageFileRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageFileDataPrivContribRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivContribRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// App Service Plan (Dedicated B1 - supports MI-based storage, no file share required)
 resource hostingPlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: 'asp-${name}'
   location: location
   tags: tags
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'B1'
+    tier: 'Basic'
   }
   properties: {}
 }
-
-// Merge base app settings with caller-provided settings
-var baseAppSettings = {
-  AzureWebJobsStorage: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};EndpointSuffix=${az.environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
-  WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};EndpointSuffix=${az.environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
-  WEBSITE_CONTENTSHARE: toLower(name)
-  FUNCTIONS_EXTENSION_VERSION: '~4'
-  FUNCTIONS_WORKER_RUNTIME: 'powershell'
-  WEBSITE_RUN_FROM_PACKAGE: '1'
-  SERVICEBUS_CONNECTION: serviceBusConnectionString
-  SERVICEBUS_QUEUE_NAME: queueName
-}
-
-// Merge settings: base + caller-provided (caller overrides base)
-var mergedSettings = union(baseAppSettings, appSettings)
 
 resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   name: name
   location: location
   tags: tags
   kind: 'functionapp'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: hostingPlan.id
     httpsOnly: true
@@ -64,13 +111,32 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
       powerShellVersion: '7.4'
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
-      appSettings: [for setting in objectKeys(mergedSettings): {
-        name: setting
-        value: mergedSettings[setting]
-      }]
+      appSettings: concat([
+        {
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccount.name
+        }
+        {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~4'
+        }
+        {
+          name: 'FUNCTIONS_WORKER_RUNTIME'
+          value: 'powershell'
+        }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '1'
+        }
+        {
+          name: 'KEYVAULT_URI'
+          value: keyVaultUri
+        }
+      ], extraAppSettings)
     }
   }
 }
 
 output functionAppName string = functionApp.name
 output functionUrl string = 'https://${functionApp.properties.defaultHostName}/api/collect'
+output principalId string = functionApp.identity.principalId
