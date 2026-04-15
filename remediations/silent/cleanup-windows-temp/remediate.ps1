@@ -79,11 +79,42 @@ foreach ($path in (Resolve-FolderPaths)) {
 }
 
 # Svuota il Cestino per tutti gli utenti
+$recycleBinCleaned = $false
 try {
-    Clear-RecycleBin -Force -ErrorAction Stop
-    Write-IntuneLog "RecycleBin emptied"
+    # Metodo 1: eliminazione diretta dal path fisico (funziona da SYSTEM)
+    $recycleBinPaths = Get-ChildItem -Path "C:\`$Recycle.Bin" -Directory -Force -ErrorAction SilentlyContinue
+    foreach ($userBin in $recycleBinPaths) {
+        $binItems = Get-ChildItem -Path $userBin.FullName -Recurse -Force -File -ErrorAction SilentlyContinue
+        foreach ($item in $binItems) {
+            try {
+                $freedBytes += $item.Length
+                Remove-Item -Path $item.FullName -Force -Confirm:$false -ErrorAction Stop
+                $totalDeleted++
+                $recycleBinCleaned = $true
+            } catch { $totalFailed++ }
+        }
+        # Rimuovi sottocartelle vuote
+        Get-ChildItem -Path $userBin.FullName -Recurse -Force -Directory -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending |
+            ForEach-Object {
+                try { Remove-Item $_.FullName -Force -Recurse -Confirm:$false -ErrorAction Stop } catch {}
+            }
+    }
+    if ($recycleBinCleaned) { Write-IntuneLog "RecycleBin emptied via filesystem" }
 } catch {
-    Write-IntuneLog "RecycleBin clear failed (may already be empty): $_" -EntryType "Warning"
+    Write-IntuneLog "RecycleBin filesystem cleanup failed: $_" -EntryType "Warning"
+}
+
+# Metodo 2: fallback con Clear-RecycleBin (se disponibile)
+if (-not $recycleBinCleaned) {
+    try {
+        if (Get-Command Clear-RecycleBin -ErrorAction SilentlyContinue) {
+            Clear-RecycleBin -Force -ErrorAction Stop
+            Write-IntuneLog "RecycleBin emptied via Clear-RecycleBin"
+        }
+    } catch {
+        Write-IntuneLog "Clear-RecycleBin fallback failed: $_" -EntryType "Warning"
+    }
 }
 
 $freedMB = [math]::Round($freedBytes / 1MB, 1)
