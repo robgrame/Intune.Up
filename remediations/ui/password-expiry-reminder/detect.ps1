@@ -59,12 +59,11 @@ try {
     }
 
     $cert = Get-CollectorCertificate -Subject $CertSubject
-    $headers = @{ "X-Client-Thumbprint" = if ($cert) { $cert.Thumbprint } else { "" } }
 
     $response = $null
     try {
         $queryUrl = "${EndpointUrl}?upn=$([uri]::EscapeDataString($upn))"
-        $params = @{ Uri = $queryUrl; Method = "Get"; Headers = $headers; TimeoutSec = 15; ErrorAction = "Stop" }
+        $params = @{ Uri = $queryUrl; Method = "Get"; TimeoutSec = 15; ErrorAction = "Stop" }
         if ($cert) { $params["Certificate"] = $cert }
         $response = Invoke-RestMethod @params
     } catch {

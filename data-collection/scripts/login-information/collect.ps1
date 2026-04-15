@@ -40,8 +40,7 @@ function Send-CollectorData {
     param($Url, $Payload, $Certificate)
     $body    = $Payload | ConvertTo-Json -Depth 10 -Compress
     $headers = @{
-        "Content-Type"        = "application/json"
-        "X-Client-Thumbprint" = $Certificate.Thumbprint
+        "Content-Type" = "application/json"
     }
     return Invoke-RestMethod -Uri $Url -Method Post -Body $body `
         -Headers $headers -Certificate $Certificate -TimeoutSec 30 -ErrorAction Stop

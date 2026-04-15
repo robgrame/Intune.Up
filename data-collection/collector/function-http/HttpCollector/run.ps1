@@ -8,7 +8,7 @@
 
     Expected request:
       POST /api/collect
-      Header: X-Client-Thumbprint: <certificate thumbprint>
+      Client certificate: presented via mutual TLS (validated by App Service + Function)
       Body (JSON):
         {
           "DeviceId":   "<Intune Device ID>",
@@ -33,34 +33,103 @@ $ErrorActionPreference = "Stop"
 # ---------------------------------------------------------------------------
 # Certificate validation
 # App Service mutual TLS populates X-ARR-ClientCert with base64-encoded cert.
-# Validates that the client cert was issued by a trusted CA (issuer thumbprint).
+# Checks: expiration, EKU, issuer thumbprint in chain, chain subject names.
 # ---------------------------------------------------------------------------
-$allowedIssuerThumbs = ($env:ALLOWED_ISSUER_THUMBPRINTS -split ',') | ForEach-Object { $_.Trim().ToUpper() } | Where-Object { $_ }
+$allowedIssuerThumbs    = ($env:ALLOWED_ISSUER_THUMBPRINTS -split ',') | ForEach-Object { $_.Trim().ToUpper() } | Where-Object { $_ }
+$requiredChainSubjects  = ($env:REQUIRED_CHAIN_SUBJECTS -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+$requiredCertSubject    = $env:REQUIRED_CERT_SUBJECT
+$checkRevocation        = $env:CHECK_CERT_REVOCATION -eq 'true'
 
 $certValid = $false
+$rejectReason = ""
 $arrCert = $Request.Headers['X-ARR-ClientCert']
 if (-not [string]::IsNullOrEmpty($arrCert)) {
     try {
         $certBytes = [Convert]::FromBase64String($arrCert)
         $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
 
-        if ($allowedIssuerThumbs) {
-            $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
-            $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
-            $null = $chain.Build($cert)
-            # Skip element[0] (leaf/client cert), check only issuers (intermediate + root CAs)
-            for ($i = 1; $i -lt $chain.ChainElements.Count; $i++) {
-                if ($chain.ChainElements[$i].Certificate.Thumbprint.ToUpper() -in $allowedIssuerThumbs) {
-                    $certValid = $true
-                    break
+        # 1. Expiration check
+        $now = [DateTime]::UtcNow
+        if ($now -lt $cert.NotBefore) {
+            $rejectReason = "Certificate not yet valid (NotBefore: $($cert.NotBefore.ToString('o')))"
+        } elseif ($now -gt $cert.NotAfter) {
+            $rejectReason = "Certificate expired (NotAfter: $($cert.NotAfter.ToString('o')))"
+        }
+
+        # 2. Leaf subject pattern check
+        if (-not $rejectReason -and $requiredCertSubject) {
+            if ($cert.Subject -notmatch [regex]::Escape($requiredCertSubject)) {
+                $rejectReason = "Subject '$($cert.Subject)' does not match required pattern '$requiredCertSubject'"
+            }
+        }
+
+        # 3. EKU check - if present, must include Client Authentication (1.3.6.1.5.5.7.3.2)
+        if (-not $rejectReason) {
+            $eku = $cert.Extensions | Where-Object { $_ -is [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension] }
+            if ($eku) {
+                $hasClientAuth = $eku.EnhancedKeyUsages | Where-Object { $_.Value -eq '1.3.6.1.5.5.7.3.2' }
+                if (-not $hasClientAuth) {
+                    $rejectReason = "EKU does not include Client Authentication (1.3.6.1.5.5.7.3.2)"
                 }
             }
+        }
+
+        # 4. Chain validation + issuer thumbprint
+        if (-not $rejectReason -and $allowedIssuerThumbs) {
+            $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
+            $chain.ChainPolicy.RevocationMode = if ($checkRevocation) {
+                [System.Security.Cryptography.X509Certificates.X509RevocationMode]::Online
+            } else {
+                [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+            }
+            $chain.ChainPolicy.RevocationFlag = [System.Security.Cryptography.X509Certificates.X509RevocationFlag]::EntireChain
+            $null = $chain.Build($cert)
+
+            # Check for critical chain errors
+            $criticalErrors = $chain.ChainStatus | Where-Object {
+                $_.Status -ne 'NoError' -and
+                $_.Status -ne 'UntrustedRoot' -and
+                (-not $checkRevocation -or ($_.Status -ne 'RevocationStatusUnknown' -and $_.Status -ne 'OfflineRevocation'))
+            }
+            if ($criticalErrors) {
+                $rejectReason = "Chain validation failed: $(($criticalErrors | ForEach-Object { "$($_.Status): $($_.StatusInformation)" }) -join '; ')"
+            }
+
+            # Check issuer thumbprint (skip leaf cert at index 0)
+            if (-not $rejectReason) {
+                $issuerFound = $false
+                for ($i = 1; $i -lt $chain.ChainElements.Count; $i++) {
+                    if ($chain.ChainElements[$i].Certificate.Thumbprint.ToUpper() -in $allowedIssuerThumbs) {
+                        $issuerFound = $true
+                        break
+                    }
+                }
+                if (-not $issuerFound) {
+                    $rejectReason = "Issuer not trusted. Issuer: '$($cert.Issuer)'"
+                }
+            }
+
+            # 5. Chain subject names check
+            if (-not $rejectReason -and $requiredChainSubjects) {
+                $chainSubjects = @()
+                for ($i = 1; $i -lt $chain.ChainElements.Count; $i++) {
+                    $chainSubjects += $chain.ChainElements[$i].Certificate.Subject
+                }
+                foreach ($reqSubject in $requiredChainSubjects) {
+                    $found = $chainSubjects | Where-Object { $_ -match [regex]::Escape($reqSubject) }
+                    if (-not $found) {
+                        $rejectReason = "Required chain subject '$reqSubject' not found. Chain: [$($chainSubjects -join ' -> ')]"
+                        break
+                    }
+                }
+            }
+
             $chain.Dispose()
         }
 
-        if (-not $certValid) {
-            Write-Warning "Rejected - cert thumbprint: '$($cert.Thumbprint)', issuer: '$($cert.Issuer)'"
-        }
+        if (-not $rejectReason) { $certValid = $true }
+        else { Write-Warning "Rejected - $rejectReason" }
+
     } catch {
         Write-Warning "Failed to parse X-ARR-ClientCert: $_"
     }

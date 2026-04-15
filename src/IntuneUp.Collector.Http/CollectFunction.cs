@@ -30,7 +30,8 @@ public sealed class CollectFunction
         _certValidator = new CertificateValidator(
             configuration["ALLOWED_ISSUER_THUMBPRINTS"],
             configuration["REQUIRED_CERT_SUBJECT"],
-            string.Equals(configuration["CHECK_CERT_REVOCATION"], "true", StringComparison.OrdinalIgnoreCase));
+            string.Equals(configuration["CHECK_CERT_REVOCATION"], "true", StringComparison.OrdinalIgnoreCase),
+            configuration["REQUIRED_CHAIN_SUBJECTS"]);
         var queueName = configuration["SERVICEBUS_QUEUE_NAME"] ?? "device-telemetry";
         _sender = serviceBusClient.CreateSender(queueName);
         _region = configuration["REGION_NAME"] ?? "unknown";

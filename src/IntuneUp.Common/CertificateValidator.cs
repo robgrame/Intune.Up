@@ -14,16 +14,26 @@ public sealed class CertificateValidator
 {
     private readonly HashSet<string> _allowedIssuerThumbprints;
     private readonly string? _requiredSubjectPattern;
+    private readonly List<string> _requiredChainSubjects;
     private readonly bool _checkRevocation;
 
     /// <param name="commaDelimitedIssuerThumbprints">Allowed issuer/CA thumbprints</param>
-    /// <param name="requiredSubjectPattern">Optional: required substring in Subject (e.g. "CN=IntuneUp")</param>
-    /// <param name="checkRevocation">If true, validates CRL/OCSP revocation status. Default false (Azure may not reach CRL endpoints).</param>
-    public CertificateValidator(string? commaDelimitedIssuerThumbprints, string? requiredSubjectPattern = null, bool checkRevocation = false)
+    /// <param name="requiredSubjectPattern">Optional: required substring in leaf cert Subject (e.g. "CN=IntuneUp")</param>
+    /// <param name="checkRevocation">If true, validates CRL/OCSP revocation status.</param>
+    /// <param name="commaDelimitedChainSubjects">Optional: required Subject Names that must appear in the chain (e.g. "CN=Corporate Root CA,CN=Issuing CA 01")</param>
+    public CertificateValidator(
+        string? commaDelimitedIssuerThumbprints,
+        string? requiredSubjectPattern = null,
+        bool checkRevocation = false,
+        string? commaDelimitedChainSubjects = null)
     {
         _allowedIssuerThumbprints = ParseList(commaDelimitedIssuerThumbprints);
         _requiredSubjectPattern = string.IsNullOrWhiteSpace(requiredSubjectPattern) ? null : requiredSubjectPattern;
         _checkRevocation = checkRevocation;
+        _requiredChainSubjects = (commaDelimitedChainSubjects ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
     }
 
     public CertificateValidationResult Validate(X509Certificate2? certificate)
@@ -87,14 +97,36 @@ public sealed class CertificateValidator
         }
 
         // Check issuer thumbprint in chain (skip element[0] which is the leaf/client cert itself)
+        bool issuerFound = false;
         for (int i = 1; i < chain.ChainElements.Count; i++)
         {
             var issuerCert = chain.ChainElements[i].Certificate;
             if (_allowedIssuerThumbprints.Contains(issuerCert.Thumbprint.ToUpperInvariant()))
-                return CertificateValidationResult.Success(certificate.Thumbprint, certificate.Subject);
+            {
+                issuerFound = true;
+                break;
+            }
         }
 
-        return CertificateValidationResult.Fail($"Issuer not trusted. Subject: '{certificate.Subject}', Issuer: '{certificate.Issuer}'");
+        if (!issuerFound)
+            return CertificateValidationResult.Fail($"Issuer not trusted. Subject: '{certificate.Subject}', Issuer: '{certificate.Issuer}'");
+
+        // 5. Chain subject names check (verify expected CAs are present in the chain)
+        if (_requiredChainSubjects.Count > 0)
+        {
+            var chainSubjects = new List<string>();
+            for (int i = 1; i < chain.ChainElements.Count; i++)
+                chainSubjects.Add(chain.ChainElements[i].Certificate.Subject);
+
+            foreach (var requiredSubject in _requiredChainSubjects)
+            {
+                if (!chainSubjects.Any(s => s.Contains(requiredSubject, StringComparison.OrdinalIgnoreCase)))
+                    return CertificateValidationResult.Fail(
+                        $"Required chain subject '{requiredSubject}' not found. Chain: [{string.Join(" -> ", chainSubjects)}]");
+            }
+        }
+
+        return CertificateValidationResult.Success(certificate.Thumbprint, certificate.Subject);
     }
 
     /// <summary>Simple bool wrapper for backward compatibility.</summary>
