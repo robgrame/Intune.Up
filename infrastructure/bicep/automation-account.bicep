@@ -40,32 +40,12 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2023-11-01' =
   }
 }
 
-// Daily schedule
-resource schedule 'Microsoft.Automation/automationAccounts/schedules@2023-11-01' = {
-  parent: automationAccount
-  name: '${runbookName}-Daily'
-  properties: {
-    frequency: 'Day'
-    interval: 1
-    startTime: dateTimeAdd(baseTime, 'P1D') // starts tomorrow
-    timeZone: 'UTC'
-    description: 'Daily execution of password expiry trigger writer'
-  }
-}
-
-// Link schedule to runbook
-resource jobSchedule 'Microsoft.Automation/automationAccounts/jobSchedules@2023-11-01' = {
-  parent: automationAccount
-  name: guid(automationAccount.id, runbook.name, schedule.name)
-  properties: {
-    runbook: {
-      name: runbook.name
-    }
-    schedule: {
-      name: schedule.name
-    }
-  }
-}
+// Daily schedule (link to runbook after publishing the runbook code separately)
+// To publish: az automation runbook replace-content --resource-group rg-intuneup-dev \
+//   --automation-account-name aa-intuneup-dev --name Write-PasswordExpiryTriggers \
+//   --content @service-desk/runbooks/server-side/Write-PasswordExpiryTriggers.ps1
+// Then: az automation runbook publish --resource-group rg-intuneup-dev \
+//   --automation-account-name aa-intuneup-dev --name Write-PasswordExpiryTriggers
 
 output automationAccountName string = automationAccount.name
 output principalId string = automationAccount.identity.principalId

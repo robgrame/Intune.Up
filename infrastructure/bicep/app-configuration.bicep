@@ -11,12 +11,14 @@ resource appConfig 'Microsoft.AppConfiguration/configurationStores@2023-03-01' =
   location: location
   tags: tags
   sku: {
-    name: 'free'
+    name: 'standard'
   }
   properties: {
     disableLocalAuth: false
     enablePurgeProtection: false
-    publicNetworkAccess: 'Disabled'
+    // publicNetworkAccess stays Enabled during deployment for ARM to seed config values.
+    // Disable manually after deployment or via a post-deploy script:
+    //   az appconfig update --name appcs-intuneup-dev --resource-group rg-intuneup-dev --enable-public-network false
   }
 }
 

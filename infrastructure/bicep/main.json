@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "10941545578557810802"
+      "templateHash": "3335934856278623517"
     }
   },
   "parameters": {
@@ -438,7 +438,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "6576129907396435852"
+              "templateHash": "16595138886230575508"
             }
           },
           "parameters": {
@@ -465,8 +465,9 @@
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "sku": {
-                "name": "Standard",
-                "tier": "Standard"
+                "name": "Premium",
+                "tier": "Premium",
+                "capacity": 1
               },
               "properties": {
                 "minimumTlsVersion": "1.2",
@@ -639,7 +640,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "5328831242343754300"
+              "templateHash": "7809932676695638003"
             }
           },
           "parameters": {
@@ -662,12 +663,11 @@
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "sku": {
-                "name": "free"
+                "name": "standard"
               },
               "properties": {
                 "disableLocalAuth": false,
-                "enablePurgeProtection": false,
-                "publicNetworkAccess": "Disabled"
+                "enablePurgeProtection": false
               }
             }
           ],
@@ -715,7 +715,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "13400546916963642791"
+              "templateHash": "9692268491387445037"
             }
           },
           "parameters": {
@@ -772,39 +772,6 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.Automation/automationAccounts', parameters('name'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.Automation/automationAccounts/schedules",
-              "apiVersion": "2023-11-01",
-              "name": "[format('{0}/{1}', parameters('name'), format('{0}-Daily', parameters('runbookName')))]",
-              "properties": {
-                "frequency": "Day",
-                "interval": 1,
-                "startTime": "[dateTimeAdd(parameters('baseTime'), 'P1D')]",
-                "timeZone": "UTC",
-                "description": "Daily execution of password expiry trigger writer"
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.Automation/automationAccounts', parameters('name'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.Automation/automationAccounts/jobSchedules",
-              "apiVersion": "2023-11-01",
-              "name": "[format('{0}/{1}', parameters('name'), guid(resourceId('Microsoft.Automation/automationAccounts', parameters('name')), parameters('runbookName'), format('{0}-Daily', parameters('runbookName'))))]",
-              "properties": {
-                "runbook": {
-                  "name": "[parameters('runbookName')]"
-                },
-                "schedule": {
-                  "name": "[format('{0}-Daily', parameters('runbookName'))]"
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.Automation/automationAccounts', parameters('name'))]",
-                "[resourceId('Microsoft.Automation/automationAccounts/runbooks', parameters('name'), parameters('runbookName'))]",
-                "[resourceId('Microsoft.Automation/automationAccounts/schedules', parameters('name'), format('{0}-Daily', parameters('runbookName')))]"
               ]
             }
           ],
