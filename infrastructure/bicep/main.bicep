@@ -153,6 +153,7 @@ module rbac 'rbac-assignments.bicep' = {
     keyVaultName: keyVault.outputs.keyVaultName
     appConfigName: appConfig.outputs.appConfigName
     serviceBusNamespaceName: serviceBus.outputs.namespaceName
+    logAnalyticsWorkspaceName: 'law-${baseName}-${environment}'
     principalIds: [
       functionHttp.outputs.principalId
       functionSb.outputs.principalId

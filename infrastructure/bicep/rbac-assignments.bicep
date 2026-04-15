@@ -77,3 +77,22 @@ resource sbReceiverRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalType: 'ServicePrincipal'
   }
 }
+
+// ---- Log Analytics Contributor (SB Function writes telemetry data) ----
+var logAnalyticsContributorRoleId = '92aaf0da-9dab-42b6-94a3-d43ce8d16293'
+
+param logAnalyticsWorkspaceName string
+
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsWorkspaceName
+}
+
+resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(logAnalytics.id, sbFunctionPrincipalId, logAnalyticsContributorRoleId)
+  scope: logAnalytics
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', logAnalyticsContributorRoleId)
+    principalId: sbFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
