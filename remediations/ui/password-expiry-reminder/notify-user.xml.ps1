@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Notifica utente – Password Expiry Reminder (XML Toast nativo)
+    Notifica utente - Password Expiry Reminder (XML Toast nativo)
 .DESCRIPTION
     Mostra una Toast Notification che avvisa l'utente della scadenza imminente
     della password e lo invita a cambiarla.
@@ -21,7 +21,7 @@ try {
     }
 } catch {}
 
-$urgency = if ($daysUntilExpiry -le 3) { "⚠️ URGENTE – " } else { "" }
+$urgency = if ($daysUntilExpiry -le 3) { "[!] URGENTE - " } else { "" }
 $title   = "${urgency}La tua password sta per scadere"
 $message = "La password scade tra $daysUntilExpiry giorni. Cambiala il prima possibile per evitare interruzioni di accesso."
 

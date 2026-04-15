@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Template - Remediation script per Intune Remediation (Silent)
 .DESCRIPTION

@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Remediation SYSTEM – Password Expiry Reminder: notifica utente
+    Remediation SYSTEM - Password Expiry Reminder: notifica utente
 .DESCRIPTION
     Legge i dati dal trigger file scritto dal server, crea uno Scheduled Task
     nel contesto utente per mostrare la notifica di cambio password.

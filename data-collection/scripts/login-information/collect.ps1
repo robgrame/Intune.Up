@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    GETINFO – Get Login Information
+    GETINFO - Get Login Information
 .DESCRIPTION
     Raccoglie informazioni di login dal device:
     - Ultimo utente loggato
@@ -24,7 +24,7 @@ $CertSubject = $env:INTUNEUP_CERT_SUBJECT ?? "CN=IntuneUp-Collector"
 $MaxLoginEvents = 10
 
 # ---------------------------------------------------------------------------
-# Helpers (dalla libreria comune – inline per portabilità Intune)
+# Helpers (dalla libreria comune - inline per portabilità Intune)
 # ---------------------------------------------------------------------------
 function Get-CollectorCertificate {
     param([string]$Subject)

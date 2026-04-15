@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Template - Remediation SYSTEM: azione tecnica + creazione Scheduled Task per notifica utente
 .DESCRIPTION

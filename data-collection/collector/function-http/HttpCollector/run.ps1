@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Azure Function – HTTP trigger entry point for client data collection.
+    Azure Function - HTTP trigger entry point for client data collection.
 .DESCRIPTION
     Receives telemetry payloads from managed devices via HTTPS + client certificate.
     Validates the client certificate thumbprint against an allowlist, enriches the
@@ -19,9 +19,9 @@
         }
 
     App Settings required:
-      ALLOWED_CERT_THUMBPRINTS  – comma-separated list of allowed thumbprints
-      SERVICEBUS_CONNECTION     – Service Bus connection string (or Managed Identity)
-      SERVICEBUS_QUEUE_NAME     – target queue name
+      ALLOWED_CERT_THUMBPRINTS  - comma-separated list of allowed thumbprints
+      SERVICEBUS_CONNECTION     - Service Bus connection string (or Managed Identity)
+      SERVICEBUS_QUEUE_NAME     - target queue name
 #>
 
 using namespace System.Net
@@ -37,7 +37,7 @@ $allowedThumbs = ($env:ALLOWED_CERT_THUMBPRINTS -split ',') | ForEach-Object { $
 $clientThumb   = ($Request.Headers['X-Client-Thumbprint'] ?? '').Trim().ToUpper()
 
 if ([string]::IsNullOrEmpty($clientThumb) -or ($clientThumb -notin $allowedThumbs)) {
-    Write-Warning "Rejected request – thumbprint: '$clientThumb'"
+    Write-Warning "Rejected request - thumbprint: '$clientThumb'"
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::Unauthorized
         Body       = '{"error":"Unauthorized"}'

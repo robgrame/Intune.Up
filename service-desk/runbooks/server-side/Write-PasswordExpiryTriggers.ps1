@@ -1,12 +1,12 @@
-<#
+﻿<#
 .SYNOPSIS
-    Azure Automation Runbook – Password Expiry Trigger Writer
+    Azure Automation Runbook - Password Expiry Trigger Writer
 .DESCRIPTION
     Runbook lato server (Azure Automation) che:
     1. Interroga Active Directory (on-prem via Hybrid Worker) o Microsoft Graph (Entra ID)
        per trovare gli utenti con password in scadenza entro ThresholdDays giorni.
     2. Per ogni device associato a quegli utenti, scrive un trigger file via Intune
-       (Graph API – Platform Script o Device Configuration) oppure direttamente
+       (Graph API - Platform Script o Device Configuration) oppure direttamente
        tramite Run Script on device.
     3. Il trigger file viene letto dalla Remediation INTUNEUP-UI-PasswordExpiryReminder.
 
@@ -66,7 +66,7 @@ foreach ($user in $users) {
             continue
         }
 
-        # Calcola giorni alla scadenza (placeholder – adattare alla fonte dati reale)
+        # Calcola giorni alla scadenza (placeholder - adattare alla fonte dati reale)
         $daysUntilExpiry = $ThresholdDays - 1  # TODO: calcolo reale
 
         $triggerPayload = @{

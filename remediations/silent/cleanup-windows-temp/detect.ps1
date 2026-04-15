@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Detection – Cleanup Windows Temp Folders
+    Detection - Cleanup Windows Temp Folders
 .DESCRIPTION
     Verifica se le cartelle temporanee contengono file da eliminare (escluse estensioni protette).
     Considera solo i file più vecchi di MinAgeDays giorni.
@@ -67,9 +67,9 @@ try {
 } catch {}
 
 if ($hasContent) {
-    Write-Host "Non compliant – folders with content: $($report -join '; ')"
+    Write-Host "Non compliant - folders with content: $($report -join '; ')"
     exit 1
 }
 
-Write-Host "Compliant – all temp folders are clean"
+Write-Host "Compliant - all temp folders are clean"
 exit 0

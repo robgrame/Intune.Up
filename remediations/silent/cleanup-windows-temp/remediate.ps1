@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Remediation – Cleanup Windows Temp Folders
+    Remediation - Cleanup Windows Temp Folders
 .DESCRIPTION
     Elimina il contenuto delle cartelle temporanee Windows e svuota il Cestino.
     Considera solo i file più vecchi di MinAgeDays giorni.

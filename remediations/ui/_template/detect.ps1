@@ -1,10 +1,10 @@
-<#
+﻿<#
 .SYNOPSIS
     Template - Detection script per Intune Remediation con UI utente
 .DESCRIPTION
     Verifica se la condizione che richiede remediation (e notifica utente) è presente.
     Exit 0 = compliant
-    Exit 1 = non compliant → esegue remediate-system.ps1
+    Exit 1 = non compliant -> esegue remediate-system.ps1
 .NOTES
     Naming:  INTUNEUP-UI-<UseCase>
     Context: SYSTEM

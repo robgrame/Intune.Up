@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Notifica utente – Password Expiry Reminder (BurntToast)
+    Notifica utente - Password Expiry Reminder (BurntToast)
 .DESCRIPTION
     Versione con BurntToast. Richiede modulo BurntToast installato sul client.
     Context: USER (via Scheduled Task)
@@ -24,7 +24,7 @@ try {
     }
     Import-Module BurntToast -ErrorAction Stop
 
-    $urgency = if ($daysUntilExpiry -le 3) { "⚠️ URGENTE – " } else { "" }
+    $urgency = if ($daysUntilExpiry -le 3) { "[!] URGENTE - " } else { "" }
     $title   = "${urgency}La tua password sta per scadere"
     $message = "La password scade tra $daysUntilExpiry giorni. Cambiala il prima possibile."
 

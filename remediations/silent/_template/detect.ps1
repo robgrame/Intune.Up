@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Template - Detection script per Intune Remediation (Silent)
 .DESCRIPTION

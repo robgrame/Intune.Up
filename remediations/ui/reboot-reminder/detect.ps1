@@ -1,9 +1,9 @@
-<#
+﻿<#
 .SYNOPSIS
-    Detection – Reboot Reminder Campaign
+    Detection - Reboot Reminder Campaign
 .DESCRIPTION
     Verifica se l'ultimo riavvio è avvenuto più di 14 giorni fa.
-    Non compliant → campagna chiede all'utente di riavviare.
+    Non compliant -> campagna chiede all'utente di riavviare.
     Intune Remediation: INTUNEUP-UI-RebootReminder
     Schedule: giornaliero
     Context: SYSTEM
@@ -17,11 +17,11 @@ try {
     $daysSince  = [math]::Round(((Get-Date) - $lastBoot).TotalDays, 1)
 
     if ($daysSince -gt $MaxDaysSinceReboot) {
-        Write-Host "Non compliant – last reboot $daysSince days ago (threshold: $MaxDaysSinceReboot days)"
+        Write-Host "Non compliant - last reboot $daysSince days ago (threshold: $MaxDaysSinceReboot days)"
         exit 1
     }
 
-    Write-Host "Compliant – last reboot $daysSince days ago"
+    Write-Host "Compliant - last reboot $daysSince days ago"
     exit 0
 
 } catch {

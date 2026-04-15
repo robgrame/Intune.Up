@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Remediation SYSTEM – Reboot Reminder: crea Scheduled Task per notifica utente
+    Remediation SYSTEM - Reboot Reminder: crea Scheduled Task per notifica utente
 .DESCRIPTION
     Non esegue azione tecnica immediata.
     Calcola i giorni dall'ultimo reboot e crea uno Scheduled Task

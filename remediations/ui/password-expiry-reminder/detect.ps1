@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Detection – Password Expiry Reminder Campaign (server-side targeting)
+    Detection - Password Expiry Reminder Campaign (server-side targeting)
 .DESCRIPTION
     L'informazione sulla scadenza password viene calcolata lato server
     (es. Runbook Azure che interroga AD/Entra ID).
@@ -30,7 +30,7 @@ $ThresholdDays     = 10
 
 try {
     if (-not (Test-Path $TriggerFile)) {
-        Write-Host "Compliant – no trigger file found (user not in target)"
+        Write-Host "Compliant - no trigger file found (user not in target)"
         exit 0
     }
 
@@ -40,18 +40,18 @@ try {
     $writtenAt = [datetime]$trigger.WrittenAt
     $ageHours  = ((Get-Date).ToUniversalTime() - $writtenAt.ToUniversalTime()).TotalHours
     if ($ageHours -gt $TriggerMaxAgeHours) {
-        Write-Host "Compliant – trigger file is stale ($([math]::Round($ageHours,1))h old), removing"
+        Write-Host "Compliant - trigger file is stale ($([math]::Round($ageHours,1))h old), removing"
         Remove-Item $TriggerFile -Force -ErrorAction SilentlyContinue
         exit 0
     }
 
     $daysUntilExpiry = [int]$trigger.DaysUntilExpiry
     if ($daysUntilExpiry -le $ThresholdDays) {
-        Write-Host "Non compliant – password expires in $daysUntilExpiry days (user: $($trigger.UserUPN))"
+        Write-Host "Non compliant - password expires in $daysUntilExpiry days (user: $($trigger.UserUPN))"
         exit 1
     }
 
-    Write-Host "Compliant – password expires in $daysUntilExpiry days"
+    Write-Host "Compliant - password expires in $daysUntilExpiry days"
     exit 0
 
 } catch {

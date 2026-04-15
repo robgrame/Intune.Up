@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Notifica utente – Reboot Reminder (XML Toast nativo, no dipendenze)
+    Notifica utente - Reboot Reminder (XML Toast nativo, no dipendenze)
 .DESCRIPTION
     Mostra una Toast Notification che chiede all'utente di riavviare il PC.
     Legge i giorni dall'ultimo reboot dal file data.json passato da remediate-system.ps1.
@@ -47,7 +47,7 @@ try {
     $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($AppId)
     $notifier.Show($toast)
 
-    # Nota: per gestire la risposta dell'utente (es. "Riavvia ora" → eseguire shutdown /r /t 60)
+    # Nota: per gestire la risposta dell'utente (es. "Riavvia ora" -> eseguire shutdown /r /t 60)
     # è necessario un listener separato. In Intune, il pattern semplificato è:
     # mostrare la notifica e lasciare che l'utente agisca manualmente.
     # Per reboot forzato con ritardo, aggiungere: Start-Sleep 5; shutdown /r /t 300

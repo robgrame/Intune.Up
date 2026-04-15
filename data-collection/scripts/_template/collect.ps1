@@ -1,15 +1,15 @@
-<#
+﻿<#
 .SYNOPSIS
-    Template – Data Collection script (client-side)
+    Template - Data Collection script (client-side)
 .DESCRIPTION
     Raccoglie informazioni dal device e le invia al collettore Azure
     tramite HTTPS con autenticazione tramite certificato client X.509.
     Non apporta modifiche al sistema.
 
     Replace:
-      TODO_USECASE          → nome del use case (es. "BitLockerStatus")
-      TODO_FUNCTION_URL     → URL della Azure Function HTTP trigger
-      TODO_CERT_SUBJECT     → Subject del certificato client (es. "CN=IntuneUp-Collector")
+      TODO_USECASE          -> nome del use case (es. "BitLockerStatus")
+      TODO_FUNCTION_URL     -> URL della Azure Function HTTP trigger
+      TODO_CERT_SUBJECT     -> Subject del certificato client (es. "CN=IntuneUp-Collector")
                               oppure usare TODO_CERT_THUMBPRINT
 
     Il certificato deve essere distribuito ai device tramite Intune (SCEP/PKCS)

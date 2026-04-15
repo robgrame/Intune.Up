@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Template - Notifica utente via Toast Notification (XML nativo Windows)
 .DESCRIPTION
@@ -17,7 +17,7 @@ $AppId       = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\po
 # -------------------------------------------------------------------------
 # TODO: personalizzare titolo, messaggio e azioni
 # -------------------------------------------------------------------------
-$ToastTitle   = "Notifica IT – TODO_TITOLO"
+$ToastTitle   = "Notifica IT - TODO_TITOLO"
 $ToastMessage = "TODO_MESSAGGIO_PER_L_UTENTE"
 $ToastLogo    = ""   # percorso immagine locale opzionale (es. logo aziendale)
 # -------------------------------------------------------------------------

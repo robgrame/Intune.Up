@@ -1,14 +1,14 @@
-<#
+﻿<#
 .SYNOPSIS
-    Azure Function – Service Bus trigger, writes data to Log Analytics.
+    Azure Function - Service Bus trigger, writes data to Log Analytics.
 .DESCRIPTION
     Consumes messages from the Service Bus queue (produced by the HTTP entry Function),
     normalises them, and writes to a Log Analytics Workspace via the Data Collector API.
 
     App Settings required:
-      LOG_ANALYTICS_WORKSPACE_ID  – Workspace ID (GUID)
-      LOG_ANALYTICS_SHARED_KEY    – Primary or secondary shared key
-      LOG_TABLE_PREFIX            – Optional prefix for table names (default: "IntuneUp")
+      LOG_ANALYTICS_WORKSPACE_ID  - Workspace ID (GUID)
+      LOG_ANALYTICS_SHARED_KEY    - Primary or secondary shared key
+      LOG_TABLE_PREFIX            - Optional prefix for table names (default: "IntuneUp")
 #>
 
 param($QueueMessage, $TriggerMetadata)
@@ -58,7 +58,7 @@ try {
     $payload = $QueueMessage | ConvertFrom-Json -ErrorAction Stop
 } catch {
     Write-Error "Failed to deserialize Service Bus message: $_"
-    throw   # rethrow → Service Bus will retry / dead-letter
+    throw   # rethrow -> Service Bus will retry / dead-letter
 }
 
 $workspaceId = $env:LOG_ANALYTICS_WORKSPACE_ID
@@ -95,7 +95,7 @@ $statusCode = Send-LogAnalyticsData -WorkspaceId $workspaceId -SharedKey $shared
     -LogType $logType -JsonBody $jsonBody
 
 if ($statusCode -in 200, 202) {
-    Write-Host "Written to Log Analytics table '$logType' for device '$($payload.DeviceName)' – HTTP $statusCode"
+    Write-Host "Written to Log Analytics table '$logType' for device '$($payload.DeviceName)' - HTTP $statusCode"
 } else {
     throw "Log Analytics API returned unexpected status: $statusCode"
 }

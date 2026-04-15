@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Notifica utente – Reboot Reminder (BurntToast)
+    Notifica utente - Reboot Reminder (BurntToast)
 .DESCRIPTION
     Versione con BurntToast. Richiede modulo BurntToast installato sul client.
     Context: USER (via Scheduled Task)

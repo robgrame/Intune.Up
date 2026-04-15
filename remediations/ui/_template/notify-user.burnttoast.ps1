@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Template - Notifica utente via Toast Notification (BurntToast module)
 .DESCRIPTION
@@ -16,7 +16,7 @@ $UseCase = "TODO_USECASE"
 # -------------------------------------------------------------------------
 # TODO: personalizzare titolo, messaggio e azioni
 # -------------------------------------------------------------------------
-$ToastTitle   = "Notifica IT – TODO_TITOLO"
+$ToastTitle   = "Notifica IT - TODO_TITOLO"
 $ToastMessage = "TODO_MESSAGGIO_PER_L_UTENTE"
 $ToastLogo    = ""   # percorso immagine opzionale (es. "C:\ProgramData\IntuneUp\logo.png")
 # -------------------------------------------------------------------------

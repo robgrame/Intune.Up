@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    L1 Service Desk – Clear Chrome Settings
+    L1 Service Desk - Clear Chrome Settings
 .DESCRIPTION
     Pulizia completa delle impostazioni e dati di navigazione di Google Chrome
     per tutti i profili utente presenti sul device.

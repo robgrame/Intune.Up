@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Detection stub per L1 Service Desk – Clear Chrome Settings
+    Detection stub per L1 Service Desk - Clear Chrome Settings
 .DESCRIPTION
     Ritorna sempre non-compliant per garantire l'esecuzione on-demand da Service Desk.
     La logica di targeting è delegata all'operatore (Run Remediation su device specifico).
