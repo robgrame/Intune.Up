@@ -87,6 +87,7 @@ module functionHttp 'function-app.bicep' = {
     location: location
     tags: tags
     keyVaultUri: keyVault.outputs.keyVaultUri
+    clientCertEnabled: true
     extraAppSettings: [
       {
         name: 'ALLOWED_CERT_THUMBPRINTS'

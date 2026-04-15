@@ -32,9 +32,25 @@ $ErrorActionPreference = "Stop"
 
 # ---------------------------------------------------------------------------
 # Certificate validation
+# App Service mutual TLS populates X-ARR-ClientCert with base64-encoded cert.
+# Falls back to X-Client-Thumbprint for local dev/testing.
 # ---------------------------------------------------------------------------
 $allowedThumbs = ($env:ALLOWED_CERT_THUMBPRINTS -split ',') | ForEach-Object { $_.Trim().ToUpper() }
-$clientThumb   = ($Request.Headers['X-Client-Thumbprint'] ?? '').Trim().ToUpper()
+
+$clientThumb = $null
+$arrCert = $Request.Headers['X-ARR-ClientCert']
+if (-not [string]::IsNullOrEmpty($arrCert)) {
+    try {
+        $certBytes = [Convert]::FromBase64String($arrCert)
+        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
+        $clientThumb = $cert.Thumbprint.ToUpper()
+    } catch {
+        Write-Warning "Failed to parse X-ARR-ClientCert: $_"
+    }
+}
+if (-not $clientThumb) {
+    $clientThumb = ($Request.Headers['X-Client-Thumbprint'] ?? '').Trim().ToUpper()
+}
 
 if ([string]::IsNullOrEmpty($clientThumb) -or ($clientThumb -notin $allowedThumbs)) {
     Write-Warning "Rejected request - thumbprint: '$clientThumb'"

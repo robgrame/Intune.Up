@@ -15,6 +15,9 @@ param keyVaultUri string
 @description('Extra app settings (name/value pairs)')
 param extraAppSettings array = []
 
+@description('Require client certificates (mutual TLS). Enable for HTTP entry point.')
+param clientCertEnabled bool = false
+
 @minLength(3)
 @maxLength(24)
 param storageAccountName string = take(replace(replace(toLower('st${name}'), '-', ''), '_', ''), 24)
@@ -107,6 +110,8 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     serverFarmId: hostingPlan.id
     httpsOnly: true
+    clientCertEnabled: clientCertEnabled
+    clientCertMode: clientCertEnabled ? 'Required' : 'Optional'
     siteConfig: {
       powerShellVersion: '7.4'
       minTlsVersion: '1.2'

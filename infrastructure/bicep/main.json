@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "4735772600558094708"
+      "templateHash": "5069146322133840999"
     }
   },
   "parameters": {
@@ -440,6 +440,9 @@
           "keyVaultUri": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value]"
           },
+          "clientCertEnabled": {
+            "value": true
+          },
           "extraAppSettings": {
             "value": [
               {
@@ -468,7 +471,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "10559203116966449135"
+              "templateHash": "5814068807486126341"
             }
           },
           "parameters": {
@@ -493,6 +496,13 @@
               "defaultValue": [],
               "metadata": {
                 "description": "Extra app settings (name/value pairs)"
+              }
+            },
+            "clientCertEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Require client certificates (mutual TLS). Enable for HTTP entry point."
               }
             },
             "storageAccountName": {
@@ -612,6 +622,8 @@
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}', parameters('name')))]",
                 "httpsOnly": true,
+                "clientCertEnabled": "[parameters('clientCertEnabled')]",
+                "clientCertMode": "[if(parameters('clientCertEnabled'), 'Required', 'Optional')]",
                 "siteConfig": {
                   "powerShellVersion": "7.4",
                   "minTlsVersion": "1.2",
@@ -708,7 +720,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "10559203116966449135"
+              "templateHash": "5814068807486126341"
             }
           },
           "parameters": {
@@ -733,6 +745,13 @@
               "defaultValue": [],
               "metadata": {
                 "description": "Extra app settings (name/value pairs)"
+              }
+            },
+            "clientCertEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Require client certificates (mutual TLS). Enable for HTTP entry point."
               }
             },
             "storageAccountName": {
@@ -852,6 +871,8 @@
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}', parameters('name')))]",
                 "httpsOnly": true,
+                "clientCertEnabled": "[parameters('clientCertEnabled')]",
+                "clientCertMode": "[if(parameters('clientCertEnabled'), 'Required', 'Optional')]",
                 "siteConfig": {
                   "powerShellVersion": "7.4",
                   "minTlsVersion": "1.2",

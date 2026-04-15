@@ -37,10 +37,34 @@ public sealed class CollectFunction
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "collect")] HttpRequestData req)
     {
-        // Validate client certificate thumbprint
-        var thumbprint = req.Headers.TryGetValues("X-Client-Thumbprint", out var values)
-            ? values.FirstOrDefault()
+        // Validate client certificate
+        // App Service mutual TLS populates X-ARR-ClientCert with the base64-encoded cert.
+        // Falls back to X-Client-Thumbprint for local dev/testing.
+        string? thumbprint = null;
+        var arrCert = req.Headers.TryGetValues("X-ARR-ClientCert", out var certValues)
+            ? certValues.FirstOrDefault()
             : null;
+
+        if (!string.IsNullOrEmpty(arrCert))
+        {
+            try
+            {
+                var certBytes = Convert.FromBase64String(arrCert);
+                var cert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certBytes);
+                thumbprint = cert.Thumbprint;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse X-ARR-ClientCert");
+            }
+        }
+        else
+        {
+            // Fallback: self-declared header (dev/testing only)
+            thumbprint = req.Headers.TryGetValues("X-Client-Thumbprint", out var values)
+                ? values.FirstOrDefault()
+                : null;
+        }
 
         if (!_certValidator.IsValid(thumbprint))
         {
