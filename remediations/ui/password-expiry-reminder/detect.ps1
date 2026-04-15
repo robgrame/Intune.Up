@@ -1,22 +1,19 @@
 ﻿<#
 .SYNOPSIS
-    Detection - Password Expiry Reminder Campaign (server-side targeting)
+    Detection - Password Expiry Reminder Campaign (pull-based)
 .DESCRIPTION
-    L'informazione sulla scadenza password viene calcolata lato server
-    (es. Runbook Azure che interroga AD/Entra ID).
-    Il server scrive un trigger file sul device tramite Intune Platform Script.
-    Questo script legge quel trigger e determina se mostrare la campagna.
+    Il client interroga un endpoint server-side (Azure Function / Azure Table)
+    per verificare se l'utente corrente ha la password in scadenza.
 
-    Trigger file path: C:\ProgramData\IntuneUp\triggers\PasswordExpiryReminder.json
-    Contenuto atteso:
-      {
-        "DaysUntilExpiry": 7,
-        "UserUPN": "user@domain.com",
-        "WrittenAt": "2026-04-15T09:00:00Z"
-      }
+    Il Runbook server-side popola una Azure Table Storage con i record:
+      PartitionKey = "PasswordExpiry"
+      RowKey       = UPN (lowercase)
+      DaysUntilExpiry = N
 
-    Il trigger viene considerato valido solo se scritto nelle ultime 25 ore
-    (evita di mostrare la campagna per trigger obsoleti).
+    Questo script legge l'UPN dell'utente corrente, chiama l'endpoint
+    e verifica se e' presente un record con scadenza <= ThresholdDays.
+
+    Se l'endpoint non e' raggiungibile, lo script esce compliant (fail-safe).
 
     Intune Remediation: INTUNEUP-UI-PasswordExpiryReminder
     Schedule: giornaliero
@@ -24,37 +21,69 @@
 #>
 
 $ErrorActionPreference = "Stop"
-$TriggerFile       = "C:\ProgramData\IntuneUp\triggers\PasswordExpiryReminder.json"
-$TriggerMaxAgeHours = 25
-$ThresholdDays     = 10
+$ThresholdDays  = 10
+$EndpointUrl    = $env:INTUNEUP_EXPIRY_ENDPOINT   # es: https://func-intuneup-http-dev.azurewebsites.net/api/password-expiry
+$CertSubject    = $env:INTUNEUP_CERT_SUBJECT ?? "CN=IntuneUp-Collector"
+$DataDir        = "C:\ProgramData\IntuneUp\notify\PasswordExpiryReminder"
+
+function Get-CurrentUserUPN {
+    try {
+        $upn = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI" `
+            -ErrorAction SilentlyContinue).LastLoggedOnSAMUser
+        if ($upn) { return $upn }
+        $dsreg = dsregcmd /status 2>&1
+        $match = $dsreg | Select-String "UserEmail\s*:\s*(.+)"
+        if ($match) { return $match.Matches.Groups[1].Value.Trim() }
+    } catch {}
+    return $null
+}
+
+function Get-CollectorCertificate {
+    param([string]$Subject)
+    Get-ChildItem -Path "Cert:\LocalMachine\My" -ErrorAction SilentlyContinue |
+        Where-Object { $_.Subject -like "*$Subject*" -and $_.NotAfter -gt (Get-Date) } |
+        Sort-Object NotAfter -Descending |
+        Select-Object -First 1
+}
 
 try {
-    if (-not (Test-Path $TriggerFile)) {
-        Write-Host "Compliant - no trigger file found (user not in target)"
+    $upn = Get-CurrentUserUPN
+    if (-not $upn) {
+        Write-Host "Compliant - no logged on user detected"
         exit 0
     }
 
-    $trigger = Get-Content $TriggerFile -Raw | ConvertFrom-Json
-
-    # Validità del trigger (non obsoleto)
-    $writtenAt = [datetime]$trigger.WrittenAt
-    $ageHours  = ((Get-Date).ToUniversalTime() - $writtenAt.ToUniversalTime()).TotalHours
-    if ($ageHours -gt $TriggerMaxAgeHours) {
-        Write-Host "Compliant - trigger file is stale ($([math]::Round($ageHours,1))h old), removing"
-        Remove-Item $TriggerFile -Force -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrEmpty($EndpointUrl)) {
+        Write-Host "Compliant - INTUNEUP_EXPIRY_ENDPOINT not configured"
         exit 0
     }
 
-    $daysUntilExpiry = [int]$trigger.DaysUntilExpiry
-    if ($daysUntilExpiry -le $ThresholdDays) {
-        Write-Host "Non compliant - password expires in $daysUntilExpiry days (user: $($trigger.UserUPN))"
+    $cert = Get-CollectorCertificate -Subject $CertSubject
+    $headers = @{ "X-Client-Thumbprint" = if ($cert) { $cert.Thumbprint } else { "" } }
+
+    $response = $null
+    try {
+        $queryUrl = "${EndpointUrl}?upn=$([uri]::EscapeDataString($upn))"
+        $params = @{ Uri = $queryUrl; Method = "Get"; Headers = $headers; TimeoutSec = 15; ErrorAction = "Stop" }
+        if ($cert) { $params["Certificate"] = $cert }
+        $response = Invoke-RestMethod @params
+    } catch {
+        Write-Host "Compliant - endpoint unreachable (fail-safe): $_"
+        exit 0
+    }
+
+    if ($response -and $response.DaysUntilExpiry -ne $null -and [int]$response.DaysUntilExpiry -le $ThresholdDays) {
+        if (-not (Test-Path $DataDir)) { New-Item -ItemType Directory -Path $DataDir -Force | Out-Null }
+        $response | ConvertTo-Json | Set-Content -Path "$DataDir\data.json" -Force -Encoding UTF8
+
+        Write-Host "Non compliant - password expires in $($response.DaysUntilExpiry) days (user: $upn)"
         exit 1
     }
 
-    Write-Host "Compliant - password expires in $daysUntilExpiry days"
+    Write-Host "Compliant - password not expiring soon for $upn"
     exit 0
 
 } catch {
     Write-Warning "Detection error: $_"
-    exit 1
+    exit 0
 }

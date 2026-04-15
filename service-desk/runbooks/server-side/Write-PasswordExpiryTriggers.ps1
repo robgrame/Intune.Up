@@ -1,101 +1,91 @@
 ﻿<#
 .SYNOPSIS
-    Azure Automation Runbook - Password Expiry Trigger Writer
+    Azure Automation Runbook - Password Expiry Data Writer
 .DESCRIPTION
     Runbook lato server (Azure Automation) che:
-    1. Interroga Active Directory (on-prem via Hybrid Worker) o Microsoft Graph (Entra ID)
-       per trovare gli utenti con password in scadenza entro ThresholdDays giorni.
-    2. Per ogni device associato a quegli utenti, scrive un trigger file via Intune
-       (Graph API - Platform Script o Device Configuration) oppure direttamente
-       tramite Run Script on device.
-    3. Il trigger file viene letto dalla Remediation INTUNEUP-UI-PasswordExpiryReminder.
+    1. Interroga Active Directory o Microsoft Graph per trovare utenti
+       con password in scadenza entro ThresholdDays giorni.
+    2. Scrive i dati in una Azure Table Storage, consultabile dai client
+       tramite la Azure Function HTTP (pattern pull-based).
+
+    I client Intune (detect.ps1) interrogano periodicamente l'endpoint
+    per verificare se il proprio UPN ha un record di scadenza.
 
     Scheduling: giornaliero (Azure Automation Schedule)
     Prerequisiti:
       - Azure Automation Account con Managed Identity
-      - Ruolo: Intune Administrator (o Graph DeviceManagementManagedDevices.ReadWrite.All)
-      - Per AD on-prem: Hybrid Runbook Worker con accesso al domain controller
-      - App Setting: THRESHOLD_DAYS (default 10)
+      - Azure Table Storage (creata dal Bicep)
+      - Moduli: Az.Storage, Microsoft.Graph.Authentication, Microsoft.Graph.Users
 #>
 
-#Requires -Modules Microsoft.Graph.Authentication, Microsoft.Graph.Users, Microsoft.Graph.DeviceManagement
+#Requires -Modules Az.Storage, Microsoft.Graph.Authentication, Microsoft.Graph.Users
 
 param(
-    [int]$ThresholdDays = 10
+    [int]$ThresholdDays = 10,
+    [string]$StorageAccountName = "stintuneupsbdev",
+    [string]$TableName = "PasswordExpiry"
 )
 
 $ErrorActionPreference = "Stop"
 
-# ---------------------------------------------------------------------------
-# Autenticazione tramite Managed Identity dell'Automation Account
-# ---------------------------------------------------------------------------
+# Autenticazione tramite Managed Identity
 Connect-MgGraph -Identity -NoWelcome
+Connect-AzAccount -Identity | Out-Null
 
-# ---------------------------------------------------------------------------
-# Recupero utenti con password in scadenza (Entra ID / cloud-only)
-# ---------------------------------------------------------------------------
-# Nota: per hybrid/on-prem, sostituire con Get-ADUser -Filter {Enabled -eq $true} |
-#       Select PasswordLastSet, msDS-UserPasswordExpiryTimeComputed, ecc.
+# Crea la tabella se non esiste
+$ctx = (Get-AzStorageAccount -ResourceGroupName "rg-intuneup-dev" -Name $StorageAccountName).Context
+$table = Get-AzStorageTable -Name $TableName -Context $ctx -ErrorAction SilentlyContinue
+if (-not $table) {
+    $table = New-AzStorageTable -Name $TableName -Context $ctx
+}
+$cloudTable = $table.CloudTable
 
+# Pulisci vecchi record (quelli scritti >2 giorni fa)
+$oldEntities = Get-AzTableRow -Table $cloudTable -PartitionKey "PasswordExpiry"
+foreach ($entity in $oldEntities) {
+    Remove-AzTableRow -Table $cloudTable -PartitionKey $entity.PartitionKey -RowKey $entity.RowKey -Confirm:$false | Out-Null
+}
+Write-Output "Cleaned $($oldEntities.Count) old records"
+
+# Query utenti con password in scadenza
 $today      = (Get-Date).ToUniversalTime()
 $targetDate = $today.AddDays($ThresholdDays)
 
 Write-Output "Querying users with password expiry before $($targetDate.ToString('yyyy-MM-dd'))"
 
 $users = Get-MgUser -All `
-    -Property "id,userPrincipalName,passwordPolicies,passwordProfile,onPremisesExtensionAttributes" `
+    -Property "id,userPrincipalName,lastPasswordChangeDateTime" `
     -Filter "accountEnabled eq true" |
     Where-Object {
-        # Per cloud-only: verificare la data di scadenza password tramite Get-MgUserAuthenticationMethod
-        # o tramite lastPasswordChangeDateTime + policy di scadenza.
-        # Placeholder: sostituire con la logica specifica dell'ambiente.
-        $true  # TODO: filtrare utenti con scadenza < ThresholdDays
+        if (-not $_.LastPasswordChangeDateTime) { return $false }
+        # Calcola scadenza assumendo policy di 90 giorni (adattare al vostro ambiente)
+        $passwordMaxAgeDays = 90  # TODO: leggere dalla policy reale
+        $expiryDate = $_.LastPasswordChangeDateTime.AddDays($passwordMaxAgeDays)
+        return $expiryDate -le $targetDate -and $expiryDate -gt $today
     }
 
-Write-Output "Found $($users.Count) candidate users (TODO: apply real expiry filter)"
+Write-Output "Found $($users.Count) users with expiring passwords"
 
-# ---------------------------------------------------------------------------
-# Per ogni utente, trova il device Intune e scrivi il trigger via Run Script
-# ---------------------------------------------------------------------------
+$written = 0
 foreach ($user in $users) {
-    try {
-        # Trova i managed device dell'utente
-        $devices = Get-MgUserManagedDevice -UserId $user.Id -ErrorAction SilentlyContinue
-        if (-not $devices) {
-            Write-Warning "No managed devices for $($user.UserPrincipalName), skipping"
-            continue
-        }
+    $passwordMaxAgeDays = 90  # TODO: leggere dalla policy reale
+    $expiryDate = $user.LastPasswordChangeDateTime.AddDays($passwordMaxAgeDays)
+    $daysUntilExpiry = [math]::Round(($expiryDate - $today).TotalDays, 0)
 
-        # Calcola giorni alla scadenza (placeholder - adattare alla fonte dati reale)
-        $daysUntilExpiry = $ThresholdDays - 1  # TODO: calcolo reale
-
-        $triggerPayload = @{
-            DaysUntilExpiry = $daysUntilExpiry
-            UserUPN         = $user.UserPrincipalName
-            WrittenAt       = $today.ToString("o")
-        } | ConvertTo-Json -Compress
-
-        # Script da eseguire sul device per scrivere il trigger file
-        $writeScript = @"
-`$dir = 'C:\ProgramData\IntuneUp\triggers'
-if (-not (Test-Path `$dir)) { New-Item -ItemType Directory -Path `$dir -Force | Out-Null }
-Set-Content -Path "`$dir\PasswordExpiryReminder.json" -Value '$triggerPayload' -Force -Encoding UTF8
-"@
-
-        foreach ($device in $devices) {
-            # Esegui script tramite Graph API (Intune Run Script)
-            # Nota: per produzione, usare Invoke-MgGraphRequest con l'endpoint appropriato
-            # o caricare il trigger tramite Intune Configuration Profile (Custom OMA-URI)
-            Write-Output "Writing trigger to device: $($device.DeviceName) for user: $($user.UserPrincipalName)"
-
-            # TODO: chiamata Graph API per Run Script su device specifico
-            # POST /deviceManagement/managedDevices/{deviceId}/runSummary (o tramite deviceShellScript)
-        }
-
-    } catch {
-        Write-Warning "Error processing user $($user.UserPrincipalName): $_"
+    $props = @{
+        DaysUntilExpiry = $daysUntilExpiry
+        UserUPN         = $user.UserPrincipalName
+        ExpiryDate      = $expiryDate.ToString("o")
+        WrittenAt       = $today.ToString("o")
     }
+
+    Add-AzTableRow -Table $cloudTable `
+        -PartitionKey "PasswordExpiry" `
+        -RowKey $user.UserPrincipalName.ToLower() `
+        -Property $props | Out-Null
+
+    $written++
 }
 
-Write-Output "Trigger writing completed"
+Write-Output "Written $written records to table $TableName"
 Disconnect-MgGraph
