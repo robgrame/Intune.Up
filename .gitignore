@@ -1,0 +1,35 @@
+# Secrets and config
+*.env
+local.settings.json
+*.pfx
+*.p12
+*.key
+*.pem
+
+# Azure deployment outputs
+*.deployment
+
+# PowerShell
+*.ps1xml
+
+# VS Code
+.vscode/
+
+# Rider / IntelliJ
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Bicep build output
+*.json.tfstate
+*.tfstate
+*.tfstate.backup
+
+# Temp
+*.tmp
+*.log

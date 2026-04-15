@@ -1,0 +1,105 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# IntuneUp – Device Telemetry Dashboard\n\nReporting basato su dati raccolti dai device tramite la pipeline IntuneUp (PowerShell → Azure Function → Service Bus → Log Analytics)."
+      },
+      "name": "header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "timeRange",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "type": 4,
+            "isRequired": true,
+            "value": { "durationMs": 86400000 },
+            "typeSettings": {
+              "selectableValues": [
+                { "durationMs": 3600000,   "label": "Last 1 hour" },
+                { "durationMs": 86400000,  "label": "Last 24 hours" },
+                { "durationMs": 604800000, "label": "Last 7 days" },
+                { "durationMs": 2592000000,"label": "Last 30 days" }
+              ]
+            },
+            "label": "Time Range"
+          }
+        ]
+      },
+      "name": "parameters"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| count",
+        "size": 4,
+        "title": "Active Devices (reporting in range)",
+        "queryType": 0,
+        "visualization": "stat"
+      },
+      "name": "active-devices-stat"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| where UptimeHours_d > 336\n| count",
+        "size": 4,
+        "title": "Devices pending reboot (>14 days)",
+        "queryType": 0,
+        "visualization": "stat"
+      },
+      "name": "pending-reboot-stat"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| where UptimeHours_d > 336\n| project DeviceName_s, UPN_s,\n          UptimeDays = round(UptimeHours_d / 24, 1),\n          LastBootTime_s\n| sort by UptimeDays desc",
+        "size": 0,
+        "title": "Devices pending reboot – detail",
+        "queryType": 0,
+        "visualization": "table",
+        "gridSettings": {
+          "formatters": [
+            { "columnMatch": "UptimeDays", "formatter": 8, "formatOptions": { "palette": "redGreen", "min": 14, "max": 30 } }
+          ]
+        }
+      },
+      "name": "pending-reboot-table"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| extend JoinType = case(\n    AzureAdJoined_b == true and DomainJoined_b == true, \"Hybrid\",\n    AzureAdJoined_b == true, \"Azure AD Only\",\n    DomainJoined_b  == true, \"Domain Only\",\n    \"Workgroup\")\n| summarize Count = count() by JoinType",
+        "size": 3,
+        "title": "Device join type distribution",
+        "queryType": 0,
+        "visualization": "piechart"
+      },
+      "name": "join-type-pie"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| project DeviceName_s, UPN_s,\n          LastLoggedOnUser_s, LastLoggedOnDisplayName_s,\n          AzureAdJoined_b, DomainJoined_b,\n          UptimeHours_d, TimeGenerated\n| sort by TimeGenerated desc",
+        "size": 0,
+        "title": "All devices – latest snapshot",
+        "queryType": 0,
+        "visualization": "table"
+      },
+      "name": "all-devices-table"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
