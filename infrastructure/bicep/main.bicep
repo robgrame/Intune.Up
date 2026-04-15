@@ -27,10 +27,6 @@ param environment string = 'dev'
 @maxValue(730)
 param logRetentionDays int = 90
 
-@description('Comma-separated list of allowed client certificate thumbprints (configure before production use)')
-@secure()
-param allowedCertThumbprints string = ''
-
 @description('Comma-separated list of allowed issuer/CA certificate thumbprints (any cert signed by these CAs is accepted)')
 @secure()
 param allowedIssuerThumbprints string = ''
@@ -93,10 +89,6 @@ module functionHttp 'function-app.bicep' = {
     keyVaultUri: keyVault.outputs.keyVaultUri
     clientCertEnabled: true
     extraAppSettings: [
-      {
-        name: 'ALLOWED_CERT_THUMBPRINTS'
-        value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/AllowedCertThumbprints)'
-      }
       {
         name: 'ALLOWED_ISSUER_THUMBPRINTS'
         value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/AllowedIssuerThumbprints)'
@@ -183,7 +175,6 @@ module configSeed 'config-seed.bicep' = {
     logAnalyticsSharedKey: logAnalytics.outputs.primarySharedKey
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
-    allowedCertThumbprints: allowedCertThumbprints
     allowedIssuerThumbprints: allowedIssuerThumbprints
   }
 }

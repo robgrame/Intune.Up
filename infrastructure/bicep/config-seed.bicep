@@ -14,9 +14,6 @@ param serviceBusQueueName string
 param logTablePrefix string = 'IntuneUp'
 
 @secure()
-param allowedCertThumbprints string
-
-@secure()
 param allowedIssuerThumbprints string = ''
 
 // ---- Key Vault secrets ----
@@ -34,12 +31,6 @@ resource secretLaKey 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: kv
   name: 'LogAnalyticsSharedKey'
   properties: { value: logAnalyticsSharedKey }
-}
-
-resource secretCertThumbs 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: kv
-  name: 'AllowedCertThumbprints'
-  properties: { value: allowedCertThumbprints }
 }
 
 resource secretIssuerThumbs 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
@@ -90,11 +81,11 @@ resource cfgRefLaKey 'Microsoft.AppConfiguration/configurationStores/keyValues@2
   }
 }
 
-resource cfgRefCertThumbs 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+resource cfgRefIssuerThumbs 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig
-  name: 'IntuneUp:Security:AllowedCertThumbprints'
+  name: 'IntuneUp:Security:AllowedIssuerThumbprints'
   properties: {
-    value: '{"uri":"${secretCertThumbs.properties.secretUri}"}'
+    value: '{"uri":"${secretIssuerThumbs.properties.secretUri}"}'
     contentType: 'application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8'
   }
 }

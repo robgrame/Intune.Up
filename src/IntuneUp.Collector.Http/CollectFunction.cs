@@ -27,9 +27,7 @@ public sealed class CollectFunction
         ServiceBusClient serviceBusClient)
     {
         _logger = logger;
-        _certValidator = new CertificateValidator(
-            configuration["ALLOWED_CERT_THUMBPRINTS"],
-            configuration["ALLOWED_ISSUER_THUMBPRINTS"]);
+        _certValidator = new CertificateValidator(configuration["ALLOWED_ISSUER_THUMBPRINTS"]);
         var queueName = configuration["SERVICEBUS_QUEUE_NAME"] ?? "device-telemetry";
         _sender = serviceBusClient.CreateSender(queueName);
         _region = configuration["REGION_NAME"] ?? "unknown";
@@ -41,7 +39,7 @@ public sealed class CollectFunction
     {
         // Validate client certificate
         // App Service mutual TLS populates X-ARR-ClientCert with the base64-encoded cert.
-        // Falls back to X-Client-Thumbprint for local dev/testing.
+        // We validate that it was issued by a trusted CA (issuer thumbprint in chain).
         bool certValid = false;
         var arrCert = req.Headers.TryGetValues("X-ARR-ClientCert", out var certValues)
             ? certValues.FirstOrDefault()
@@ -53,10 +51,9 @@ public sealed class CollectFunction
             {
                 var certBytes = Convert.FromBase64String(arrCert);
                 var cert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certBytes);
-                // Validates thumbprint OR issuer chain
                 certValid = _certValidator.IsValid(cert);
                 if (!certValid)
-                    _logger.LogWarning("Rejected request - thumbprint: {Thumbprint}, issuer: {Issuer}", cert.Thumbprint, cert.Issuer);
+                    _logger.LogWarning("Rejected - cert thumbprint: {Thumbprint}, issuer: {Issuer}", cert.Thumbprint, cert.Issuer);
             }
             catch (Exception ex)
             {
@@ -65,19 +62,13 @@ public sealed class CollectFunction
         }
         else
         {
-            // Fallback: self-declared header (dev/testing only)
-            var thumbprint = req.Headers.TryGetValues("X-Client-Thumbprint", out var values)
-                ? values.FirstOrDefault()
-                : null;
-            certValid = _certValidator.IsValid(thumbprint);
-            if (!certValid)
-                _logger.LogWarning("Rejected request - thumbprint: {Thumbprint}", thumbprint);
+            _logger.LogWarning("Rejected - no client certificate provided");
         }
 
         if (!certValid)
         {
             var unauthorized = req.CreateResponse(HttpStatusCode.Unauthorized);
-            await unauthorized.WriteAsJsonAsync(new { error = "Unauthorized" });
+            await unauthorized.WriteAsJsonAsync(new { error = "Unauthorized - valid client certificate required" });
             return unauthorized;
         }
 
