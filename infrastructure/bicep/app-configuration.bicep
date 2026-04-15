@@ -16,6 +16,7 @@ resource appConfig 'Microsoft.AppConfiguration/configurationStores@2023-03-01' =
   properties: {
     disableLocalAuth: false
     enablePurgeProtection: false
+    publicNetworkAccess: 'Disabled'
   }
 }
 

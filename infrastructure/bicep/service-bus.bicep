@@ -17,6 +17,7 @@ resource namespace 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
   }
   properties: {
     minimumTlsVersion: '1.2'
+    publicNetworkAccess: 'Disabled'
   }
 }
 
@@ -42,6 +43,7 @@ resource authRule 'Microsoft.ServiceBus/namespaces/authorizationRules@2022-10-01
 }
 
 output namespaceName string = namespace.name
+output namespaceId string = namespace.id
 output queueName string = queue.name
 
 #disable-next-line outputs-should-not-contain-secrets

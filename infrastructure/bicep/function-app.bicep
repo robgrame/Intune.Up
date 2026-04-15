@@ -18,6 +18,9 @@ param extraAppSettings array = []
 @description('Require client certificates (mutual TLS). Enable for HTTP entry point.')
 param clientCertEnabled bool = false
 
+@description('Subnet ID for VNet integration (outbound traffic goes through VNet)')
+param vnetIntegrationSubnetId string = ''
+
 @minLength(3)
 @maxLength(24)
 param storageAccountName string = take(replace(replace(toLower('st${name}'), '-', ''), '_', ''), 24)
@@ -112,6 +115,8 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
     httpsOnly: true
     clientCertEnabled: clientCertEnabled
     clientCertMode: clientCertEnabled ? 'Required' : 'Optional'
+    virtualNetworkSubnetId: !empty(vnetIntegrationSubnetId) ? vnetIntegrationSubnetId : null
+    vnetRouteAllEnabled: !empty(vnetIntegrationSubnetId)
     siteConfig: {
       powerShellVersion: '7.4'
       minTlsVersion: '1.2'
@@ -145,3 +150,5 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
 output functionAppName string = functionApp.name
 output functionUrl string = 'https://${functionApp.properties.defaultHostName}/api/collect'
 output principalId string = functionApp.identity.principalId
+output storageAccountId string = storageAccount.id
+output storageAccountName string = storageAccount.name
