@@ -27,9 +27,9 @@ param environment string = 'dev'
 @maxValue(730)
 param logRetentionDays int = 90
 
-@description('Comma-separated list of allowed client certificate thumbprints')
+@description('Comma-separated list of allowed client certificate thumbprints (configure before production use)')
 @secure()
-param allowedCertThumbprints string
+param allowedCertThumbprints string = ''
 
 var tags = {
   project: 'IntuneUp'
