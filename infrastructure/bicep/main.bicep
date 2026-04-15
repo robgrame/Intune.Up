@@ -31,6 +31,10 @@ param logRetentionDays int = 90
 @secure()
 param allowedCertThumbprints string = ''
 
+@description('Comma-separated list of allowed issuer/CA certificate thumbprints (any cert signed by these CAs is accepted)')
+@secure()
+param allowedIssuerThumbprints string = ''
+
 var tags = {
   project: 'IntuneUp'
   environment: environment
@@ -92,6 +96,10 @@ module functionHttp 'function-app.bicep' = {
       {
         name: 'ALLOWED_CERT_THUMBPRINTS'
         value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/AllowedCertThumbprints)'
+      }
+      {
+        name: 'ALLOWED_ISSUER_THUMBPRINTS'
+        value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/AllowedIssuerThumbprints)'
       }
       {
         name: 'SERVICEBUS_CONNECTION'
@@ -176,6 +184,7 @@ module configSeed 'config-seed.bicep' = {
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
     allowedCertThumbprints: allowedCertThumbprints
+    allowedIssuerThumbprints: allowedIssuerThumbprints
   }
 }
 

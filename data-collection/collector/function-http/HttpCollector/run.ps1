@@ -33,27 +33,56 @@ $ErrorActionPreference = "Stop"
 # ---------------------------------------------------------------------------
 # Certificate validation
 # App Service mutual TLS populates X-ARR-ClientCert with base64-encoded cert.
-# Falls back to X-Client-Thumbprint for local dev/testing.
+# Validates by: (1) client cert thumbprint OR (2) issuer/CA thumbprint in chain.
+# Falls back to X-Client-Thumbprint header for local dev/testing.
 # ---------------------------------------------------------------------------
-$allowedThumbs = ($env:ALLOWED_CERT_THUMBPRINTS -split ',') | ForEach-Object { $_.Trim().ToUpper() }
+$allowedThumbs       = ($env:ALLOWED_CERT_THUMBPRINTS -split ',') | ForEach-Object { $_.Trim().ToUpper() } | Where-Object { $_ }
+$allowedIssuerThumbs = ($env:ALLOWED_ISSUER_THUMBPRINTS -split ',') | ForEach-Object { $_.Trim().ToUpper() } | Where-Object { $_ }
 
-$clientThumb = $null
+$certValid = $false
 $arrCert = $Request.Headers['X-ARR-ClientCert']
 if (-not [string]::IsNullOrEmpty($arrCert)) {
     try {
         $certBytes = [Convert]::FromBase64String($arrCert)
         $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
-        $clientThumb = $cert.Thumbprint.ToUpper()
+
+        # Check 1: direct thumbprint match
+        if ($allowedThumbs -and ($cert.Thumbprint.ToUpper() -in $allowedThumbs)) {
+            $certValid = $true
+        }
+
+        # Check 2: issuer/CA thumbprint in certificate chain
+        if (-not $certValid -and $allowedIssuerThumbs) {
+            $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
+            $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+            $null = $chain.Build($cert)
+            foreach ($element in $chain.ChainElements) {
+                if ($element.Certificate.Thumbprint.ToUpper() -in $allowedIssuerThumbs) {
+                    $certValid = $true
+                    break
+                }
+            }
+            $chain.Dispose()
+        }
+
+        if (-not $certValid) {
+            Write-Warning "Rejected - thumbprint: '$($cert.Thumbprint)', issuer: '$($cert.Issuer)'"
+        }
     } catch {
         Write-Warning "Failed to parse X-ARR-ClientCert: $_"
     }
-}
-if (-not $clientThumb) {
+} else {
+    # Fallback: self-declared header (dev/testing only)
     $clientThumb = ($Request.Headers['X-Client-Thumbprint'] ?? '').Trim().ToUpper()
+    if ($allowedThumbs -and ($clientThumb -in $allowedThumbs)) {
+        $certValid = $true
+    }
+    if (-not $certValid) {
+        Write-Warning "Rejected - thumbprint header: '$clientThumb'"
+    }
 }
 
-if ([string]::IsNullOrEmpty($clientThumb) -or ($clientThumb -notin $allowedThumbs)) {
-    Write-Warning "Rejected request - thumbprint: '$clientThumb'"
+if (-not $certValid) {
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::Unauthorized
         Body       = '{"error":"Unauthorized"}'

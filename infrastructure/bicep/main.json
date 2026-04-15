@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "5069146322133840999"
+      "templateHash": "2105695344368988576"
     }
   },
   "parameters": {
@@ -49,6 +49,13 @@
       "defaultValue": "",
       "metadata": {
         "description": "Comma-separated list of allowed client certificate thumbprints (configure before production use)"
+      }
+    },
+    "allowedIssuerThumbprints": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Comma-separated list of allowed issuer/CA certificate thumbprints (any cert signed by these CAs is accepted)"
       }
     }
   },
@@ -448,6 +455,10 @@
               {
                 "name": "ALLOWED_CERT_THUMBPRINTS",
                 "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/AllowedCertThumbprints)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
+              },
+              {
+                "name": "ALLOWED_ISSUER_THUMBPRINTS",
+                "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/AllowedIssuerThumbprints)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
               },
               {
                 "name": "SERVICEBUS_CONNECTION",
@@ -1089,6 +1100,9 @@
           },
           "allowedCertThumbprints": {
             "value": "[parameters('allowedCertThumbprints')]"
+          },
+          "allowedIssuerThumbprints": {
+            "value": "[parameters('allowedIssuerThumbprints')]"
           }
         },
         "template": {
@@ -1098,7 +1112,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "2447642173186666984"
+              "templateHash": "148021148807766251"
             }
           },
           "parameters": {
@@ -1126,6 +1140,10 @@
             },
             "allowedCertThumbprints": {
               "type": "securestring"
+            },
+            "allowedIssuerThumbprints": {
+              "type": "securestring",
+              "defaultValue": ""
             }
           },
           "resources": [
@@ -1151,6 +1169,14 @@
               "name": "[format('{0}/{1}', parameters('keyVaultName'), 'AllowedCertThumbprints')]",
               "properties": {
                 "value": "[parameters('allowedCertThumbprints')]"
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'AllowedIssuerThumbprints')]",
+              "properties": {
+                "value": "[parameters('allowedIssuerThumbprints')]"
               }
             },
             {

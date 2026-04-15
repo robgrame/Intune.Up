@@ -16,6 +16,9 @@ param logTablePrefix string = 'IntuneUp'
 @secure()
 param allowedCertThumbprints string
 
+@secure()
+param allowedIssuerThumbprints string = ''
+
 // ---- Key Vault secrets ----
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
@@ -37,6 +40,12 @@ resource secretCertThumbs 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: kv
   name: 'AllowedCertThumbprints'
   properties: { value: allowedCertThumbprints }
+}
+
+resource secretIssuerThumbs 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: kv
+  name: 'AllowedIssuerThumbprints'
+  properties: { value: allowedIssuerThumbprints }
 }
 
 // ---- App Configuration key-values ----
