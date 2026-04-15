@@ -10,7 +10,9 @@ namespace IntuneUp.Collector.Http;
 /// <summary>
 /// Endpoint for clients to check if a user's password is expiring.
 /// Called by detect.ps1 on endpoints: GET /api/password-expiry?upn=user@domain.com
-/// Reads from Azure Table Storage (populated by server-side Runbook).
+/// Reads from Azure Table Storage, kept in sync by:
+///   - Runbook (daily): adds users with expiring passwords
+///   - PasswordChangeWebhook: removes users who already changed password
 /// </summary>
 public sealed class PasswordExpiryFunction
 {
