@@ -62,6 +62,18 @@ resource cfgTablePrefix 'Microsoft.AppConfiguration/configurationStores/keyValue
   properties: { value: logTablePrefix }
 }
 
+resource cfgClaimCheckContainer 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:ClaimCheck:ContainerName'
+  properties: { value: 'claim-check' }
+}
+
+resource cfgClaimCheckStorage 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:ClaimCheck:StorageAccountName'
+  properties: { value: '' }  // defaults to Function's own storage account
+}
+
 // Key Vault references in App Configuration (so Functions can read everything from App Config)
 resource cfgRefSbConn 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig

@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "10193036905906954463"
+      "templateHash": "6045222141711059112"
     }
   },
   "parameters": {
@@ -1072,7 +1072,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "10672918948743575027"
+              "templateHash": "15221286257373945219"
             }
           },
           "parameters": {
@@ -1150,6 +1150,22 @@
               "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:LogAnalytics:TablePrefix')]",
               "properties": {
                 "value": "[parameters('logTablePrefix')]"
+              }
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:ClaimCheck:ContainerName')]",
+              "properties": {
+                "value": "claim-check"
+              }
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:ClaimCheck:StorageAccountName')]",
+              "properties": {
+                "value": ""
               }
             },
             {

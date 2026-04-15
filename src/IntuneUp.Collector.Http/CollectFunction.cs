@@ -1,6 +1,8 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
 using IntuneUp.Common;
 using IntuneUp.Common.Models;
 using Microsoft.Azure.Functions.Worker;
@@ -13,18 +15,23 @@ namespace IntuneUp.Collector.Http;
 /// <summary>
 /// HTTP entry point for device telemetry collection.
 /// Validates client certificate, enriches payload, enqueues to Service Bus.
+/// Uses claim-check pattern for large payloads (>200KB): stores in Blob, sends reference in queue.
 /// </summary>
 public sealed class CollectFunction
 {
+    private const int ClaimCheckThresholdBytes = 200 * 1024; // 200 KB
+
     private readonly ILogger<CollectFunction> _logger;
     private readonly CertificateValidator _certValidator;
     private readonly ServiceBusSender _sender;
+    private readonly BlobContainerClient _blobContainer;
     private readonly string _region;
 
     public CollectFunction(
         ILogger<CollectFunction> logger,
         IConfiguration configuration,
-        ServiceBusClient serviceBusClient)
+        ServiceBusClient serviceBusClient,
+        BlobServiceClient blobServiceClient)
     {
         _logger = logger;
         _certValidator = new CertificateValidator(
@@ -35,6 +42,8 @@ public sealed class CollectFunction
         var queueName = configuration["IntuneUp:ServiceBus:QueueName"] ?? "device-telemetry";
         _sender = serviceBusClient.CreateSender(queueName);
         _region = configuration["REGION_NAME"] ?? "unknown";
+        var containerName = configuration["IntuneUp:ClaimCheck:ContainerName"] ?? "claim-check";
+        _blobContainer = blobServiceClient.GetBlobContainerClient(containerName);
     }
 
     [Function("Collect")]
@@ -100,7 +109,7 @@ public sealed class CollectFunction
             return badReq;
         }
 
-        // Enrich and enqueue
+        // Enrich and enqueue (with claim-check for large payloads)
         var enriched = new EnrichedTelemetryMessage
         {
             DeviceId = payload.DeviceId,
@@ -113,14 +122,49 @@ public sealed class CollectFunction
         };
 
         var messageBody = JsonSerializer.Serialize(enriched);
-        await _sender.SendMessageAsync(new ServiceBusMessage(messageBody)
-        {
-            ContentType = "application/json",
-            Subject = payload.UseCase,
-            MessageId = $"{payload.DeviceId}-{payload.UseCase}-{DateTimeOffset.UtcNow.Ticks}"
-        });
+        var messageBytes = Encoding.UTF8.GetBytes(messageBody);
+        var messageId = $"{payload.DeviceId}-{payload.UseCase}-{DateTimeOffset.UtcNow.Ticks}";
 
-        _logger.LogInformation("Accepted payload from {DeviceName} use case {UseCase}", payload.DeviceName, payload.UseCase);
+        if (messageBytes.Length > ClaimCheckThresholdBytes)
+        {
+            // Claim-check: store payload in Blob, send reference in queue
+            var blobName = $"{payload.UseCase}/{DateTime.UtcNow:yyyy/MM/dd}/{messageId}.json";
+            await _blobContainer.CreateIfNotExistsAsync();
+            await _blobContainer.UploadBlobAsync(blobName, new BinaryData(messageBytes));
+
+            var claimCheckMessage = new ServiceBusMessage(JsonSerializer.Serialize(new
+            {
+                ClaimCheck = true,
+                BlobName = blobName,
+                enriched.DeviceId,
+                enriched.DeviceName,
+                enriched.UseCase,
+                enriched.ReceivedAt
+            }))
+            {
+                ContentType = "application/json",
+                Subject = payload.UseCase,
+                MessageId = messageId,
+                ApplicationProperties = { ["ClaimCheck"] = true }
+            };
+            await _sender.SendMessageAsync(claimCheckMessage);
+
+            _logger.LogInformation("Claim-check: stored {Size}KB payload in blob for {DeviceName}/{UseCase}",
+                messageBytes.Length / 1024, payload.DeviceName, payload.UseCase);
+        }
+        else
+        {
+            // Small payload: send directly in queue message
+            await _sender.SendMessageAsync(new ServiceBusMessage(messageBody)
+            {
+                ContentType = "application/json",
+                Subject = payload.UseCase,
+                MessageId = messageId
+            });
+
+            _logger.LogInformation("Accepted {Size}B payload from {DeviceName} use case {UseCase}",
+                messageBytes.Length, payload.DeviceName, payload.UseCase);
+        }
 
         var accepted = req.CreateResponse(HttpStatusCode.Accepted);
         await accepted.WriteAsJsonAsync(new { status = "accepted" });

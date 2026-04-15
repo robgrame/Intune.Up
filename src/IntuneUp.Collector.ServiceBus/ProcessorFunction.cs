@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
 using IntuneUp.Common.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
@@ -12,11 +13,13 @@ namespace IntuneUp.Collector.ServiceBus;
 
 /// <summary>
 /// Processes messages from the Service Bus queue and writes to Log Analytics.
+/// Supports claim-check pattern: if message has ClaimCheck property, fetches payload from Blob Storage.
 /// </summary>
 public sealed class ProcessorFunction
 {
     private readonly ILogger<ProcessorFunction> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly BlobContainerClient _blobContainer;
     private readonly string _workspaceId;
     private readonly string _sharedKey;
     private readonly string _tablePrefix;
@@ -24,6 +27,7 @@ public sealed class ProcessorFunction
     public ProcessorFunction(
         ILogger<ProcessorFunction> logger,
         IHttpClientFactory httpClientFactory,
+        BlobServiceClient blobServiceClient,
         IConfiguration configuration)
     {
         _logger = logger;
@@ -31,6 +35,8 @@ public sealed class ProcessorFunction
         _workspaceId = configuration["IntuneUp:LogAnalytics:WorkspaceId"] ?? throw new InvalidOperationException("IntuneUp:LogAnalytics:WorkspaceId not set");
         _sharedKey = configuration["IntuneUp:LogAnalytics:SharedKey"] ?? throw new InvalidOperationException("IntuneUp:LogAnalytics:SharedKey not set");
         _tablePrefix = configuration["IntuneUp:LogAnalytics:TablePrefix"] ?? "IntuneUp";
+        var containerName = configuration["IntuneUp:ClaimCheck:ContainerName"] ?? "claim-check";
+        _blobContainer = blobServiceClient.GetBlobContainerClient(containerName);
     }
 
     [Function("Processor")]
@@ -38,7 +44,29 @@ public sealed class ProcessorFunction
         [ServiceBusTrigger("%IntuneUp__ServiceBus__QueueName%", Connection = "IntuneUp__ServiceBus__Connection")]
         ServiceBusReceivedMessage message)
     {
-        var payload = JsonSerializer.Deserialize<EnrichedTelemetryMessage>(message.Body);
+        EnrichedTelemetryMessage? payload;
+
+        // Claim-check: fetch full payload from Blob Storage if flagged
+        if (message.ApplicationProperties.TryGetValue("ClaimCheck", out var claimCheck) && claimCheck is true)
+        {
+            var claimRef = JsonSerializer.Deserialize<JsonElement>(message.Body);
+            var blobName = claimRef.GetProperty("BlobName").GetString()
+                ?? throw new InvalidOperationException("ClaimCheck message missing BlobName");
+
+            var blobClient = _blobContainer.GetBlobClient(blobName);
+            var download = await blobClient.DownloadContentAsync();
+            payload = JsonSerializer.Deserialize<EnrichedTelemetryMessage>(download.Value.Content);
+
+            _logger.LogInformation("Claim-check: fetched {BlobName} ({Size}KB)", blobName, download.Value.Content.ToMemory().Length / 1024);
+
+            // Cleanup blob after processing
+            await blobClient.DeleteIfExistsAsync();
+        }
+        else
+        {
+            payload = JsonSerializer.Deserialize<EnrichedTelemetryMessage>(message.Body);
+        }
+
         if (payload is null)
         {
             _logger.LogError("Failed to deserialize message {MessageId}", message.MessageId);
