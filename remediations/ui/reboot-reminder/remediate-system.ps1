@@ -68,8 +68,13 @@ if ($useBurntToast) {
 
 # Fallback: native Windows Toast XML
 try {
-    [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-    [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+        powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path
+        exit $LASTEXITCODE
+    }
+    [void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+    [void][Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]
+    [void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
 
     $toastXml = @"
 <toast scenario="reminder" activationType="foreground">

@@ -46,8 +46,13 @@ $urgency = if ($daysUntilExpiry -le 3) { "[!] URGENTE - " } else { "" }
 $title   = "${urgency}La tua password sta per scadere"
 $message = "La password scade tra $daysUntilExpiry giorni. Cambiala il prima possibile."
 try {
-    [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-    [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+        powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path
+        exit $LASTEXITCODE
+    }
+    [void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+    [void][Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]
+    [void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
     $scenario = if ($daysUntilExpiry -le 3) { 'alarm' } else { 'reminder' }
     $toastXml = "<toast scenario=`"$scenario`" activationType=`"foreground`"><visual><binding template=`"ToastGeneric`"><text>$title</text><text>$message</text></binding></visual><actions><action content=`"Cambia password ora`" arguments=`"https://aka.ms/sspr`" activationType=`"protocol`"/><action content=`"Piu tardi`" arguments=`"later`" activationType=`"foreground`"/></actions></toast>"
     $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
