@@ -27,7 +27,10 @@ public sealed class CollectFunction
         ServiceBusClient serviceBusClient)
     {
         _logger = logger;
-        _certValidator = new CertificateValidator(configuration["ALLOWED_ISSUER_THUMBPRINTS"]);
+        _certValidator = new CertificateValidator(
+            configuration["ALLOWED_ISSUER_THUMBPRINTS"],
+            configuration["REQUIRED_CERT_SUBJECT"],
+            string.Equals(configuration["CHECK_CERT_REVOCATION"], "true", StringComparison.OrdinalIgnoreCase));
         var queueName = configuration["SERVICEBUS_QUEUE_NAME"] ?? "device-telemetry";
         _sender = serviceBusClient.CreateSender(queueName);
         _region = configuration["REGION_NAME"] ?? "unknown";
@@ -51,9 +54,12 @@ public sealed class CollectFunction
             {
                 var certBytes = Convert.FromBase64String(arrCert);
                 var cert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certBytes);
-                certValid = _certValidator.IsValid(cert);
+                var result = _certValidator.Validate(cert);
+                certValid = result.Valid;
                 if (!certValid)
-                    _logger.LogWarning("Rejected - cert thumbprint: {Thumbprint}, issuer: {Issuer}", cert.Thumbprint, cert.Issuer);
+                    _logger.LogWarning("Certificate rejected: {Reason}", result.Reason);
+                else
+                    _logger.LogDebug("Certificate accepted: {Thumbprint} {Subject}", result.Thumbprint, result.Subject);
             }
             catch (Exception ex)
             {

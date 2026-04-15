@@ -48,8 +48,9 @@ if (-not [string]::IsNullOrEmpty($arrCert)) {
             $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
             $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
             $null = $chain.Build($cert)
-            foreach ($element in $chain.ChainElements) {
-                if ($element.Certificate.Thumbprint.ToUpper() -in $allowedIssuerThumbs) {
+            # Skip element[0] (leaf/client cert), check only issuers (intermediate + root CAs)
+            for ($i = 1; $i -lt $chain.ChainElements.Count; $i++) {
+                if ($chain.ChainElements[$i].Certificate.Thumbprint.ToUpper() -in $allowedIssuerThumbs) {
                     $certValid = $true
                     break
                 }
