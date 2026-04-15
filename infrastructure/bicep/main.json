@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "16435829332377166863"
+      "templateHash": "13479626169606598271"
     }
   },
   "parameters": {
@@ -46,8 +46,9 @@
     },
     "allowedCertThumbprints": {
       "type": "securestring",
+      "defaultValue": "",
       "metadata": {
-        "description": "Comma-separated list of allowed client certificate thumbprints"
+        "description": "Comma-separated list of allowed client certificate thumbprints (configure before production use)"
       }
     }
   },
@@ -903,11 +904,20 @@
           "appConfigName": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigName.value]"
           },
+          "serviceBusNamespaceName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.namespaceName.value]"
+          },
           "principalIds": {
             "value": [
               "[reference(resourceId('Microsoft.Resources/deployments', 'function-http'), '2025-04-01').outputs.principalId.value]",
               "[reference(resourceId('Microsoft.Resources/deployments', 'function-sb'), '2025-04-01').outputs.principalId.value]"
             ]
+          },
+          "httpFunctionPrincipalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'function-http'), '2025-04-01').outputs.principalId.value]"
+          },
+          "sbFunctionPrincipalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'function-sb'), '2025-04-01').outputs.principalId.value]"
           }
         },
         "template": {
@@ -917,7 +927,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "10857596078783504420"
+              "templateHash": "5588189784919642230"
             }
           },
           "parameters": {
@@ -927,13 +937,24 @@
             "appConfigName": {
               "type": "string"
             },
+            "serviceBusNamespaceName": {
+              "type": "string"
+            },
             "principalIds": {
               "type": "array"
+            },
+            "httpFunctionPrincipalId": {
+              "type": "string"
+            },
+            "sbFunctionPrincipalId": {
+              "type": "string"
             }
           },
           "variables": {
             "kvSecretsUserRoleId": "4633458b-17de-408a-b874-0445c86b69e6",
-            "appConfigDataReaderRoleId": "516239f1-63e1-4d78-a4de-a74fb236a071"
+            "appConfigDataReaderRoleId": "516239f1-63e1-4d78-a4de-a74fb236a071",
+            "sbDataSenderRoleId": "69a216fc-b8fb-44d8-bc22-1f3c2cd27a39",
+            "sbDataReceiverRoleId": "4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0"
           },
           "resources": [
             {
@@ -965,6 +986,28 @@
                 "principalId": "[parameters('principalIds')[copyIndex()]]",
                 "principalType": "ServicePrincipal"
               }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]",
+              "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName')), parameters('httpFunctionPrincipalId'), variables('sbDataSenderRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('sbDataSenderRoleId'))]",
+                "principalId": "[parameters('httpFunctionPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]",
+              "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName')), parameters('sbFunctionPrincipalId'), variables('sbDataReceiverRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('sbDataReceiverRoleId'))]",
+                "principalId": "[parameters('sbFunctionPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
             }
           ]
         }
@@ -973,7 +1016,8 @@
         "[resourceId('Microsoft.Resources/deployments', 'app-configuration')]",
         "[resourceId('Microsoft.Resources/deployments', 'function-http')]",
         "[resourceId('Microsoft.Resources/deployments', 'function-sb')]",
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
+        "[resourceId('Microsoft.Resources/deployments', 'service-bus')]"
       ]
     },
     {

@@ -145,17 +145,20 @@ module functionSb 'function-app.bicep' = {
   }
 }
 
-// ---- Step 3: RBAC (Function App MIs -> KV + App Config) ----
+// ---- Step 3: RBAC (Function App MIs -> KV + App Config + Service Bus) ----
 
 module rbac 'rbac-assignments.bicep' = {
   name: 'rbac-assignments'
   params: {
     keyVaultName: keyVault.outputs.keyVaultName
     appConfigName: appConfig.outputs.appConfigName
+    serviceBusNamespaceName: serviceBus.outputs.namespaceName
     principalIds: [
       functionHttp.outputs.principalId
       functionSb.outputs.principalId
     ]
+    httpFunctionPrincipalId: functionHttp.outputs.principalId
+    sbFunctionPrincipalId: functionSb.outputs.principalId
   }
 }
 
