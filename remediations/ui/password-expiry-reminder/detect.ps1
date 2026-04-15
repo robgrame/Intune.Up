@@ -71,7 +71,7 @@ try {
         exit 0
     }
 
-    if ($response -and $response.DaysUntilExpiry -ne $null -and [int]$response.DaysUntilExpiry -le $ThresholdDays) {
+    if ($response -and $response.Expiring -eq $true -and [int]$response.DaysUntilExpiry -le $ThresholdDays) {
         if (-not (Test-Path $DataDir)) { New-Item -ItemType Directory -Path $DataDir -Force | Out-Null }
         $response | ConvertTo-Json | Set-Content -Path "$DataDir\data.json" -Force -Encoding UTF8
 

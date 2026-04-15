@@ -74,6 +74,18 @@ resource cfgClaimCheckStorage 'Microsoft.AppConfiguration/configurationStores/ke
   properties: { value: '' }  // defaults to Function's own storage account
 }
 
+resource cfgPwdExpiryTable 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:PasswordExpiry:TableName'
+  properties: { value: 'PasswordExpiry' }
+}
+
+resource cfgPwdExpiryStorage 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:PasswordExpiry:StorageAccountName'
+  properties: { value: '' }  // defaults to SB Function's storage account
+}
+
 // Key Vault references in App Configuration (so Functions can read everything from App Config)
 resource cfgRefSbConn 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig

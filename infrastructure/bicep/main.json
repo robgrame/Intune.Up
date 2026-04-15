@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "6045222141711059112"
+      "templateHash": "17697939332938537120"
     }
   },
   "parameters": {
@@ -410,6 +410,139 @@
             "appConfigId": {
               "type": "string",
               "value": "[resourceId('Microsoft.AppConfiguration/configurationStores', parameters('name'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "automation-account",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[format('aa-{0}-{1}', parameters('baseName'), parameters('environment'))]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.40.2.10011",
+              "templateHash": "13400546916963642791"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "runbookName": {
+              "type": "string",
+              "defaultValue": "Write-PasswordExpiryTriggers",
+              "metadata": {
+                "description": "Name of the password expiry runbook"
+              }
+            },
+            "baseTime": {
+              "type": "string",
+              "defaultValue": "[utcNow()]"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Automation/automationAccounts",
+              "apiVersion": "2023-11-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "sku": {
+                  "name": "Basic"
+                },
+                "publicNetworkAccess": true
+              }
+            },
+            {
+              "type": "Microsoft.Automation/automationAccounts/runbooks",
+              "apiVersion": "2023-11-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('runbookName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "runbookType": "PowerShell72",
+                "description": "Queries AD/Entra for users with expiring passwords and writes data to Azure Table Storage for client pull-based detection.",
+                "logProgress": true,
+                "logVerbose": false
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('name'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Automation/automationAccounts/schedules",
+              "apiVersion": "2023-11-01",
+              "name": "[format('{0}/{1}', parameters('name'), format('{0}-Daily', parameters('runbookName')))]",
+              "properties": {
+                "frequency": "Day",
+                "interval": 1,
+                "startTime": "[dateTimeAdd(parameters('baseTime'), 'P1D')]",
+                "timeZone": "UTC",
+                "description": "Daily execution of password expiry trigger writer"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('name'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Automation/automationAccounts/jobSchedules",
+              "apiVersion": "2023-11-01",
+              "name": "[format('{0}/{1}', parameters('name'), guid(resourceId('Microsoft.Automation/automationAccounts', parameters('name')), parameters('runbookName'), format('{0}-Daily', parameters('runbookName'))))]",
+              "properties": {
+                "runbook": {
+                  "name": "[parameters('runbookName')]"
+                },
+                "schedule": {
+                  "name": "[format('{0}-Daily', parameters('runbookName'))]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Automation/automationAccounts', parameters('name'))]",
+                "[resourceId('Microsoft.Automation/automationAccounts/runbooks', parameters('name'), parameters('runbookName'))]",
+                "[resourceId('Microsoft.Automation/automationAccounts/schedules', parameters('name'), format('{0}-Daily', parameters('runbookName')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "automationAccountName": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "principalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Automation/automationAccounts', parameters('name')), '2023-11-01', 'full').identity.principalId]"
             }
           }
         }
@@ -908,7 +1041,8 @@
           "principalIds": {
             "value": [
               "[reference(resourceId('Microsoft.Resources/deployments', 'function-http'), '2025-04-01').outputs.principalId.value]",
-              "[reference(resourceId('Microsoft.Resources/deployments', 'function-sb'), '2025-04-01').outputs.principalId.value]"
+              "[reference(resourceId('Microsoft.Resources/deployments', 'function-sb'), '2025-04-01').outputs.principalId.value]",
+              "[reference(resourceId('Microsoft.Resources/deployments', 'automation-account'), '2025-04-01').outputs.principalId.value]"
             ]
           },
           "httpFunctionPrincipalId": {
@@ -916,6 +1050,12 @@
           },
           "sbFunctionPrincipalId": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'function-sb'), '2025-04-01').outputs.principalId.value]"
+          },
+          "automationAccountPrincipalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'automation-account'), '2025-04-01').outputs.principalId.value]"
+          },
+          "httpStorageAccountName": {
+            "value": "[format('st{0}http{1}', parameters('baseName'), parameters('environment'))]"
           }
         },
         "template": {
@@ -925,7 +1065,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "4975221630600379014"
+              "templateHash": "1873210663689549005"
             }
           },
           "parameters": {
@@ -947,6 +1087,14 @@
             "sbFunctionPrincipalId": {
               "type": "string"
             },
+            "automationAccountPrincipalId": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "httpStorageAccountName": {
+              "type": "string",
+              "defaultValue": ""
+            },
             "logAnalyticsWorkspaceName": {
               "type": "string"
             }
@@ -956,7 +1104,8 @@
             "appConfigDataReaderRoleId": "516239f1-63e1-4d78-a4de-a74fb236a071",
             "sbDataSenderRoleId": "69a216fc-b8fb-44d8-bc22-1f3c2cd27a39",
             "sbDataReceiverRoleId": "4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0",
-            "logAnalyticsContributorRoleId": "92aaf0da-9dab-42b6-94a3-d43ce8d16293"
+            "logAnalyticsContributorRoleId": "92aaf0da-9dab-42b6-94a3-d43ce8d16293",
+            "storageTableDataContributorRoleId": "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
           },
           "resources": [
             {
@@ -1021,12 +1170,25 @@
                 "principalId": "[parameters('sbFunctionPrincipalId')]",
                 "principalType": "ServicePrincipal"
               }
+            },
+            {
+              "condition": "[and(not(empty(parameters('automationAccountPrincipalId'))), not(empty(parameters('httpStorageAccountName'))))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('httpStorageAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('httpStorageAccountName')), parameters('automationAccountPrincipalId'), variables('storageTableDataContributorRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageTableDataContributorRoleId'))]",
+                "principalId": "[parameters('automationAccountPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
             }
           ]
         }
       },
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'app-configuration')]",
+        "[resourceId('Microsoft.Resources/deployments', 'automation-account')]",
         "[resourceId('Microsoft.Resources/deployments', 'function-http')]",
         "[resourceId('Microsoft.Resources/deployments', 'function-sb')]",
         "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
@@ -1072,7 +1234,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "15221286257373945219"
+              "templateHash": "4810616745743680770"
             }
           },
           "parameters": {
@@ -1171,6 +1333,22 @@
             {
               "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
               "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:PasswordExpiry:TableName')]",
+              "properties": {
+                "value": "PasswordExpiry"
+              }
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
+              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:PasswordExpiry:StorageAccountName')]",
+              "properties": {
+                "value": ""
+              }
+            },
+            {
+              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
+              "apiVersion": "2023-03-01",
               "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:ServiceBus:ConnectionString')]",
               "properties": {
                 "value": "[format('{{\"uri\":\"{0}\"}}', reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'ServiceBusConnection'), '2023-07-01').secretUri)]",
@@ -1259,6 +1437,10 @@
     "appConfigEndpoint": {
       "type": "string",
       "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigEndpoint.value]"
+    },
+    "automationAccountName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'automation-account'), '2025-04-01').outputs.automationAccountName.value]"
     }
   }
 }

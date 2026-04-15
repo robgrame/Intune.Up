@@ -53,4 +53,15 @@ builder.Services.AddSingleton(sp =>
     return new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), defaultCredential);
 });
 
+// Register TableServiceClient (for password expiry lookups)
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var storageAccountName = config["IntuneUp:PasswordExpiry:StorageAccountName"]
+        ?? Environment.GetEnvironmentVariable("AzureWebJobsStorage__accountName")
+        ?? "stintuneupsbdev";
+    return new Azure.Data.Tables.TableServiceClient(
+        new Uri($"https://{storageAccountName}.table.core.windows.net"), defaultCredential);
+});
+
 builder.Build().Run();

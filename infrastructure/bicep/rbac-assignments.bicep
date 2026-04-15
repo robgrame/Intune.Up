@@ -1,6 +1,6 @@
 // ============================================================
-// RBAC Assignments - grants Function App MIs access to KV, App Config, Service Bus
-// Deployed AFTER Function Apps, KV, App Config and Service Bus exist.
+// RBAC Assignments - grants MIs access to KV, App Config, Service Bus, Storage
+// Deployed AFTER Function Apps, Automation Account, KV, App Config and Service Bus exist.
 // ============================================================
 
 param keyVaultName string
@@ -9,6 +9,8 @@ param serviceBusNamespaceName string
 param principalIds array
 param httpFunctionPrincipalId string
 param sbFunctionPrincipalId string
+param automationAccountPrincipalId string = ''
+param httpStorageAccountName string = ''
 
 // ---- Key Vault Secrets User (both Functions) ----
 var kvSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
@@ -93,6 +95,23 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', logAnalyticsContributorRoleId)
     principalId: sbFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---- Storage Table Data Contributor (Automation Account writes password expiry data) ----
+var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+
+resource httpStorage 'Microsoft.Storage/storageAccounts@2023-01-01' existing = if (!empty(httpStorageAccountName)) {
+  name: httpStorageAccountName
+}
+
+resource tableContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(automationAccountPrincipalId) && !empty(httpStorageAccountName)) {
+  name: guid(httpStorage.id, automationAccountPrincipalId, storageTableDataContributorRoleId)
+  scope: httpStorage
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: automationAccountPrincipalId
     principalType: 'ServicePrincipal'
   }
 }

@@ -77,6 +77,15 @@ module appConfig 'app-configuration.bicep' = {
   }
 }
 
+module automationAccount 'automation-account.bicep' = {
+  name: 'automation-account'
+  params: {
+    name: 'aa-${baseName}-${environment}'
+    location: location
+    tags: tags
+  }
+}
+
 // ---- Step 2: Function Apps (depend on KV for URI in app settings) ----
 
 module functionHttp 'function-app.bicep' = {
@@ -124,7 +133,7 @@ module functionSb 'function-app.bicep' = {
   }
 }
 
-// ---- Step 3: RBAC (Function App MIs -> KV + App Config + Service Bus) ----
+// ---- Step 3: RBAC (Function App MIs + Automation Account -> KV + App Config + Service Bus + Storage) ----
 
 module rbac 'rbac-assignments.bicep' = {
   name: 'rbac-assignments'
@@ -136,9 +145,12 @@ module rbac 'rbac-assignments.bicep' = {
     principalIds: [
       functionHttp.outputs.principalId
       functionSb.outputs.principalId
+      automationAccount.outputs.principalId
     ]
     httpFunctionPrincipalId: functionHttp.outputs.principalId
     sbFunctionPrincipalId: functionSb.outputs.principalId
+    automationAccountPrincipalId: automationAccount.outputs.principalId
+    httpStorageAccountName: 'st${baseName}http${environment}'
   }
 }
 
@@ -163,3 +175,4 @@ output httpFunctionUrl string = functionHttp.outputs.functionUrl
 output serviceBusNamespace string = serviceBus.outputs.namespaceName
 output keyVaultName string = keyVault.outputs.keyVaultName
 output appConfigEndpoint string = appConfig.outputs.appConfigEndpoint
+output automationAccountName string = automationAccount.outputs.automationAccountName
