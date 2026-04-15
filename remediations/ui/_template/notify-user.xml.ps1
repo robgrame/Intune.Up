@@ -30,8 +30,15 @@ function Show-ToastNotification {
         [string]$LogoPath = ""
     )
 
-    [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-    [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+    # Load WinRT assemblies (PS 5.1 only - PS 7+ should use BurntToast or powershell.exe)
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+        Write-Warning "Toast XML notifications require PowerShell 5.1 (powershell.exe). Re-launching..."
+        powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path
+        exit $LASTEXITCODE
+    }
+    [void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+    [void][Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]
+    [void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
 
     $logoXml = if ($LogoPath -and (Test-Path $LogoPath)) {
         "<image placement='appLogoOverride' src='file:///$LogoPath'/>"
