@@ -41,7 +41,7 @@ public sealed class ProcessorFunction
 
     [Function("Processor")]
     public async Task Run(
-        [ServiceBusTrigger("%IntuneUp__ServiceBus__QueueName%", Connection = "IntuneUp__ServiceBus__Connection")]
+        [ServiceBusTrigger("%ServiceBusQueueName%", Connection = "ServiceBusConnection")]
         ServiceBusReceivedMessage message)
     {
         EnrichedTelemetryMessage? payload;
