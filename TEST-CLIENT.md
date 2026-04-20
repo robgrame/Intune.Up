@@ -4,50 +4,47 @@ Script di simulazione client che invia report di inventario device alla HTTP fun
 
 ## ⚡ Quick Start
 
-### Per Dev/Test Environment (auto-setup):
+### Per Admin: Autorizzare Certificato Test
+
+**Prerequisito:** Prima di testare, il certificato deve essere autorizzato nel Key Vault.
 
 ```powershell
-.\test-client.ps1 -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect" `
+# Admin esegue:
+.\authorize-certificate.ps1 `
+  -KeyVaultName "kv-intuneup-prod" `
+  -Thumbprint "4E050ADBD50A4132C1CC2B237929E113431993D2"
+```
+
+### Per Dev: Test con Certificato Autorizzato
+
+```powershell
+# Dopo che l'admin ha autorizzato il certificato:
+.\test-client.ps1 `
+  -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect" `
   -ResourceGroup "rg-intuneup-prod" `
   -FunctionAppName "func-intuneup-http-prod" `
-  -KeyVaultName "kv-intuneup-prod"
+  -KeyVaultName "kv-intuneup-prod" `
+  -PayloadSizeKB 80 `
+  -SkipCertSetup
 ```
 
-Lo script fa tutto automaticamente:
-1. ✅ Crea/usa certificato self-signed
-2. ✅ Lo registra in Key Vault come CA autorizzata
-3. ✅ Recupera la function key
-4. ✅ Invia il payload
+Lo script fa tutto:
+1. ✅ Usa il certificato già autorizzato
+2. ✅ Recupera la function key
+3. ✅ Invia il payload con headers mTLS
+4. ✅ Verifica la risposta 202 Accepted
 
-### Per Produzione (con certificato PKI):
+### Test Rapido Senza mTLS (Basic Connectivity)
 
 ```powershell
-# Prerequisiti:
-# 1. Certificato PKI già installato in Cert:\LocalMachine\My
-# 2. CA del certificato già in AllowedIssuerThumbprints (Key Vault)
-# 3. Function key già recuperata
-
-$cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -like "*YourCompany*" }
-$functionKey = "your-function-key"
-
-$payload = @{
-    DeviceId = "DEVICE-001"
-    DeviceName = "LAPTOP-USER1"
-    UseCase = "DeviceInventory"
-    Data = @{
-        OS = @{ Name = "Windows 11"; Build = "22621" }
-        Hardware = @{ ProcessorCount = 8; TotalMemoryGB = 16 }
-    }
-} | ConvertTo-Json
-
-Invoke-WebRequest `
-    -Uri "https://func-intuneup-http-prod.azurewebsites.net/api/collect" `
-    -Method Post `
-    -Certificate $cert `
-    -Headers @{ "x-functions-key" = $functionKey } `
-    -ContentType "application/json" `
-    -Body $payload
+# Verifica che la function sia raggiungibile:
+.\test-client-basic.ps1 `
+  -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect" `
+  -ResourceGroup "rg-intuneup-prod" `
+  -FunctionAppName "func-intuneup-http-prod"
 ```
+
+**Nota:** Questo test fallirà con 403 (Forbidden) finché il certificato non è autorizzato, ma serve a validare che la function è online.
 
 ---
 
@@ -270,27 +267,64 @@ Se Payload > 200 KB:
    3. Check if payload was stored in blob (if >200KB)
 ```
 
-### ❌ Certificato non Autorizzato (401)
+### ❌ Certificato non Autorizzato (401 o 403)
 
 ```
 ❌ Request failed: Response status code does not indicate success: 401 (Unauthorized).
    Error body: {"error":"Unauthorized - valid client certificate required"}
 
-💡 Manual certificate registration:
-   Run this command to authorize the certificate:
-   az keyvault secret set --vault-name kv-intuneup-prod --name AllowedIssuerThumbprints --value '3F4DD6BE8C7C4181A24E37B18A73C96C1F75BE66'
+OR
+
+❌ Connection test failed: Response status code does not indicate success: 403 (Forbidden).
 ```
 
-**Risoluzione:**
-```powershell
-# Ottieni il thumbprint
-$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -like "*IntuneUp*" }
+**Causa:** La function richiede un certificato client valido (mTLS), ma il thumbprint non è autorizzato in `AllowedIssuerThumbprints` nel Key Vault.
 
-# Registra manualmente (richiede KV edit permissions)
+**Risoluzione per Admin:**
+
+**Opzione 1: Usa lo script di autorizzazione (Recommended)**
+```powershell
+# L'admin esegue:
+.\authorize-certificate.ps1 `
+  -KeyVaultName "kv-intuneup-prod" `
+  -Thumbprint "4E050ADBD50A4132C1CC2B237929E113431993D2"
+```
+
+Script automaticamente:
+- Legge i thumbprint attuali dal KV
+- Aggiunge il nuovo thumbprint
+- Deduplica
+- Salva il nuovo valore
+
+**Opzione 2: Comando manuale**
+```powershell
+# Ottieni il thumbprint dal certificato
+$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -like "*IntuneUp*" }
+$thumbprint = $cert.Thumbprint
+
+# Registra manualmente in Key Vault (richiede permessi KV Secrets Officer)
 az keyvault secret set `
   --vault-name kv-intuneup-prod `
   --name AllowedIssuerThumbprints `
-  --value $cert.Thumbprint
+  --value $thumbprint
+```
+
+**Opzione 3: Aggiungere a thumbprint multipli**
+```powershell
+# Se ci sono già altri thumbprint autorizzati:
+$current = "3F4DD6BE8C7C4181A24E37B18A73C96C1F75BE66,60C4DBFFFFFF..."
+$newThumbprint = "4E050ADBD50A4132C1CC2B237929E113431993D2"
+$updated = "$current,$newThumbprint"
+
+az keyvault secret set `
+  --vault-name kv-intuneup-prod `
+  --name AllowedIssuerThumbprints `
+  --value $updated
+```
+
+Dopo aver aggiunto il thumbprint al KV, ritesta con:
+```powershell
+.\test-client.ps1 -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect" -SkipCertSetup
 ```
 
 ### ❌ Function Key Non Trovata
