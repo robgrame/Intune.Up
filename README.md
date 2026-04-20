@@ -143,6 +143,21 @@ Intune.Up/
 
 ### Deploy Infrastructure
 
+The automated `deploy.ps1` script handles the complete deployment pipeline:
+
+```powershell
+# Deploy to westeurope (recommended - tested and verified)
+.\deploy.ps1 -Environment prod -Location westeurope
+
+# Or if you have a CA certificate thumbprint for mTLS validation:
+.\deploy.ps1 -Environment prod -Location westeurope -AllowedIssuerThumbprints "ABC123..."
+
+# Skip build if you've already compiled the functions:
+.\deploy.ps1 -Environment prod -Location westeurope -SkipBuild
+```
+
+**Manual Deployment (if you prefer):**
+
 ```bash
 az login
 az group create --name rg-intuneup-prod --location westeurope
@@ -150,8 +165,10 @@ az group create --name rg-intuneup-prod --location westeurope
 az deployment group create \
   --resource-group rg-intuneup-prod \
   --template-file infrastructure/bicep/main.bicep \
-  --parameters environment=prod
+  --parameters environment=prod location=westeurope
 ```
+
+> **Note:** This subscription has VM quota constraints in `eastus`. Use `westeurope` or other available regions. See [DEPLOYMENT-SUCCESS.md](DEPLOYMENT-SUCCESS.md) for details.
 
 ### Complete mTLS Setup (Admin Only)
 
