@@ -17,6 +17,7 @@ resource namespace 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
   }
   properties: {
     minimumTlsVersion: '1.2'
+    disableLocalAuth: true          // Enforce Managed Identity only (no shared keys)
   }
 }
 
@@ -32,18 +33,6 @@ resource queue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01-preview' = {
   }
 }
 
-// Shared Access Policy con Send + Listen per le Functions
-resource authRule 'Microsoft.ServiceBus/namespaces/authorizationRules@2022-10-01-preview' = {
-  parent: namespace
-  name: 'IntuneUpFunctions'
-  properties: {
-    rights: ['Send', 'Listen']
-  }
-}
-
 output namespaceName string = namespace.name
 output namespaceId string = namespace.id
 output queueName string = queue.name
-
-#disable-next-line outputs-should-not-contain-secrets
-output connectionString string = authRule.listKeys().primaryConnectionString

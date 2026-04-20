@@ -52,6 +52,8 @@ resource appConfigRoleAssignments 'Microsoft.Authorization/roleAssignments@2022-
 
 // ---- Service Bus Data Sender (HTTP Function sends messages) ----
 var sbDataSenderRoleId = '69a216fc-b8fb-44d8-bc22-1f3c2cd27a39'
+// ---- Service Bus Data Owner (full control for identity-based connections) ----
+var sbDataOwnerRoleId = '090c5cfd-751d-490a-894a-3ce6f1109419'
 
 resource serviceBus 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' existing = {
   name: serviceBusNamespaceName
@@ -67,6 +69,16 @@ resource sbSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
+resource sbOwnerRoleHttp 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBus.id, httpFunctionPrincipalId, sbDataOwnerRoleId)
+  scope: serviceBus
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sbDataOwnerRoleId)
+    principalId: httpFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ---- Service Bus Data Receiver (SB Function consumes messages) ----
 var sbDataReceiverRoleId = '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0'
 
@@ -75,6 +87,16 @@ resource sbReceiverRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: serviceBus
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sbDataReceiverRoleId)
+    principalId: sbFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource sbOwnerRoleSb 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBus.id, sbFunctionPrincipalId, sbDataOwnerRoleId)
+  scope: serviceBus
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sbDataOwnerRoleId)
     principalId: sbFunctionPrincipalId
     principalType: 'ServicePrincipal'
   }

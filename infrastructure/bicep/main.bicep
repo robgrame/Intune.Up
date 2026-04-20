@@ -157,7 +157,7 @@ module functionHttp 'function-app.bicep' = {
       }
       {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-        value: 'InstrumentationKey=${appInsights.outputs.instrumentationKey}'
+        value: appInsights.outputs.connectionString
       }
       {
         name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
@@ -181,18 +181,17 @@ module functionSb 'function-app.bicep' = {
         value: appConfig.outputs.appConfigEndpoint
       }
       {
-        // Required at runtime startup for SB trigger binding (before DI/AppConfig loads)
-        name: 'IntuneUp__ServiceBus__Connection'
-        value: '@Microsoft.KeyVault(SecretUri=${keyVault.outputs.keyVaultUri}secrets/ServiceBusConnection)'
+        // Identity-based Service Bus connection for trigger binding (disableLocalAuth=true)
+        name: 'ServiceBusConnection__fullyQualifiedNamespace'
+        value: '${serviceBus.outputs.namespaceName}.servicebus.windows.net'
       }
       {
-        // Required at runtime startup for SB trigger binding
-        name: 'IntuneUp__ServiceBus__QueueName'
+        name: 'ServiceBusQueueName'
         value: serviceBus.outputs.queueName
       }
       {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-        value: 'InstrumentationKey=${appInsights.outputs.instrumentationKey}'
+        value: appInsights.outputs.connectionString
       }
       {
         name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
@@ -230,7 +229,6 @@ module configSeed 'config-seed.bicep' = {
   params: {
     keyVaultName: keyVault.outputs.keyVaultName
     appConfigName: appConfig.outputs.appConfigName
-    serviceBusConnectionString: serviceBus.outputs.connectionString
     logAnalyticsSharedKey: logAnalytics.outputs.primarySharedKey
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName

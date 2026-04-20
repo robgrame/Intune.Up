@@ -113,7 +113,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     serverFarmId: hostingPlan.id
     httpsOnly: true
-    clientCertEnabled: false
+    clientCertEnabled: clientCertEnabled
     virtualNetworkSubnetId: !empty(vnetIntegrationSubnetId) ? vnetIntegrationSubnetId : null
     vnetRouteAllEnabled: !empty(vnetIntegrationSubnetId)
     siteConfig: {

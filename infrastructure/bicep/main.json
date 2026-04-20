@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.40.2.10011",
-      "templateHash": "10146141864684319622"
+      "version": "0.42.1.51946",
+      "templateHash": "11757393438024082489"
     }
   },
   "parameters": {
@@ -125,8 +125,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "1248823448557267843"
+              "version": "0.42.1.51946",
+              "templateHash": "1363020696059087686"
             }
           },
           "parameters": {
@@ -211,8 +211,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "6805920378821903563"
+              "version": "0.42.1.51946",
+              "templateHash": "6621027209870967211"
             }
           },
           "parameters": {
@@ -243,7 +243,8 @@
                 "tier": "Standard"
               },
               "properties": {
-                "minimumTlsVersion": "1.2"
+                "minimumTlsVersion": "1.2",
+                "disableLocalAuth": true
               }
             },
             {
@@ -256,20 +257,6 @@
                 "defaultMessageTimeToLive": "P1D",
                 "lockDuration": "PT5M",
                 "enablePartitioning": false
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.ServiceBus/namespaces', parameters('namespaceName'))]"
-              ]
-            },
-            {
-              "type": "Microsoft.ServiceBus/namespaces/AuthorizationRules",
-              "apiVersion": "2022-10-01-preview",
-              "name": "[format('{0}/{1}', parameters('namespaceName'), 'IntuneUpFunctions')]",
-              "properties": {
-                "rights": [
-                  "Send",
-                  "Listen"
-                ]
               },
               "dependsOn": [
                 "[resourceId('Microsoft.ServiceBus/namespaces', parameters('namespaceName'))]"
@@ -288,10 +275,6 @@
             "queueName": {
               "type": "string",
               "value": "[parameters('queueName')]"
-            },
-            "connectionString": {
-              "type": "string",
-              "value": "[listKeys(resourceId('Microsoft.ServiceBus/namespaces/AuthorizationRules', parameters('namespaceName'), 'IntuneUpFunctions'), '2022-10-01-preview').primaryConnectionString]"
             }
           }
         }
@@ -323,8 +306,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "1635174346917136774"
+              "version": "0.42.1.51946",
+              "templateHash": "17223492731150134955"
             }
           },
           "parameters": {
@@ -407,8 +390,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "2336238479478283015"
+              "version": "0.42.1.51946",
+              "templateHash": "5705980990428817501"
             }
           },
           "parameters": {
@@ -482,8 +465,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "9692268491387445037"
+              "version": "0.42.1.51946",
+              "templateHash": "4823923216118683401"
             }
           },
           "parameters": {
@@ -585,8 +568,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "4913492623158271154"
+              "version": "0.42.1.51946",
+              "templateHash": "15605983076035329810"
             }
           },
           "parameters": {
@@ -624,6 +607,10 @@
             "instrumentationKey": {
               "type": "string",
               "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').InstrumentationKey]"
+            },
+            "connectionString": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').ConnectionString]"
             },
             "appInsightsId": {
               "type": "string",
@@ -675,8 +662,16 @@
                 "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigEndpoint.value]"
               },
               {
+                "name": "IntuneUp__ServiceBus__Namespace",
+                "value": "[format('{0}.servicebus.windows.net', reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.namespaceName.value)]"
+              },
+              {
+                "name": "IntuneUp__ServiceBus__QueueName",
+                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
+              },
+              {
                 "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
-                "value": "[format('InstrumentationKey={0}', reference(resourceId('Microsoft.Resources/deployments', 'app-insights'), '2025-04-01').outputs.instrumentationKey.value)]"
+                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-insights'), '2025-04-01').outputs.connectionString.value]"
               },
               {
                 "name": "ApplicationInsightsAgent_EXTENSION_VERSION",
@@ -691,8 +686,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "699713543139362920"
+              "version": "0.42.1.51946",
+              "templateHash": "15703127944354464413"
             }
           },
           "parameters": {
@@ -832,8 +827,8 @@
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "sku": {
-                "name": "S1",
-                "tier": "Standard"
+                "name": "B1",
+                "tier": "Basic"
               },
               "properties": {}
             },
@@ -850,7 +845,7 @@
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}', parameters('name')))]",
                 "httpsOnly": true,
-                "clientCertEnabled": false,
+                "clientCertEnabled": "[parameters('clientCertEnabled')]",
                 "virtualNetworkSubnetId": "[if(not(empty(parameters('vnetIntegrationSubnetId'))), parameters('vnetIntegrationSubnetId'), null())]",
                 "vnetRouteAllEnabled": "[not(empty(parameters('vnetIntegrationSubnetId')))]",
                 "siteConfig": {
@@ -894,7 +889,8 @@
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'app-configuration')]",
         "[resourceId('Microsoft.Resources/deployments', 'app-insights')]",
-        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]"
+        "[resourceId('Microsoft.Resources/deployments', 'key-vault')]",
+        "[resourceId('Microsoft.Resources/deployments', 'service-bus')]"
       ]
     },
     {
@@ -929,16 +925,16 @@
                 "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigEndpoint.value]"
               },
               {
-                "name": "IntuneUp__ServiceBus__Connection",
-                "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/ServiceBusConnection)', reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value)]"
+                "name": "ServiceBusConnection__fullyQualifiedNamespace",
+                "value": "[format('{0}.servicebus.windows.net', reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.namespaceName.value)]"
               },
               {
-                "name": "IntuneUp__ServiceBus__QueueName",
+                "name": "ServiceBusQueueName",
                 "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
               },
               {
                 "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
-                "value": "[format('InstrumentationKey={0}', reference(resourceId('Microsoft.Resources/deployments', 'app-insights'), '2025-04-01').outputs.instrumentationKey.value)]"
+                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-insights'), '2025-04-01').outputs.connectionString.value]"
               },
               {
                 "name": "ApplicationInsightsAgent_EXTENSION_VERSION",
@@ -953,8 +949,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "699713543139362920"
+              "version": "0.42.1.51946",
+              "templateHash": "15703127944354464413"
             }
           },
           "parameters": {
@@ -1094,8 +1090,8 @@
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "sku": {
-                "name": "S1",
-                "tier": "Standard"
+                "name": "B1",
+                "tier": "Basic"
               },
               "properties": {}
             },
@@ -1112,7 +1108,7 @@
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}', parameters('name')))]",
                 "httpsOnly": true,
-                "clientCertEnabled": false,
+                "clientCertEnabled": "[parameters('clientCertEnabled')]",
                 "virtualNetworkSubnetId": "[if(not(empty(parameters('vnetIntegrationSubnetId'))), parameters('vnetIntegrationSubnetId'), null())]",
                 "vnetRouteAllEnabled": "[not(empty(parameters('vnetIntegrationSubnetId')))]",
                 "siteConfig": {
@@ -1208,8 +1204,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "1873210663689549005"
+              "version": "0.42.1.51946",
+              "templateHash": "13300509565633988029"
             }
           },
           "parameters": {
@@ -1247,6 +1243,7 @@
             "kvSecretsUserRoleId": "4633458b-17de-408a-b874-0445c86b69e6",
             "appConfigDataReaderRoleId": "516239f1-63e1-4d78-a4de-a74fb236a071",
             "sbDataSenderRoleId": "69a216fc-b8fb-44d8-bc22-1f3c2cd27a39",
+            "sbDataOwnerRoleId": "090c5cfd-751d-490a-894a-3ce6f1109419",
             "sbDataReceiverRoleId": "4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0",
             "logAnalyticsContributorRoleId": "92aaf0da-9dab-42b6-94a3-d43ce8d16293",
             "storageTableDataContributorRoleId": "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
@@ -1297,9 +1294,31 @@
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
               "scope": "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]",
+              "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName')), parameters('httpFunctionPrincipalId'), variables('sbDataOwnerRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('sbDataOwnerRoleId'))]",
+                "principalId": "[parameters('httpFunctionPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]",
               "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName')), parameters('sbFunctionPrincipalId'), variables('sbDataReceiverRoleId'))]",
               "properties": {
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('sbDataReceiverRoleId'))]",
+                "principalId": "[parameters('sbFunctionPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]",
+              "name": "[guid(resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName')), parameters('sbFunctionPrincipalId'), variables('sbDataOwnerRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('sbDataOwnerRoleId'))]",
                 "principalId": "[parameters('sbFunctionPrincipalId')]",
                 "principalType": "ServicePrincipal"
               }
@@ -1355,9 +1374,6 @@
           "appConfigName": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'app-configuration'), '2025-04-01').outputs.appConfigName.value]"
           },
-          "serviceBusConnectionString": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.connectionString.value]"
-          },
           "logAnalyticsSharedKey": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'log-analytics'), '2025-04-01').outputs.primarySharedKey.value]"
           },
@@ -1368,10 +1384,10 @@
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
           },
           "claimCheckStorageAccountName": {
-            "value": "[format('st{0}claimcheck{1}', parameters('baseName'), parameters('environment'))]"
+            "value": "[format('st{0}cc{1}', parameters('baseName'), parameters('environment'))]"
           },
           "passwordExpiryStorageAccountName": {
-            "value": "[format('st{0}pwdexp{1}', parameters('baseName'), parameters('environment'))]"
+            "value": "[format('st{0}pe{1}', parameters('baseName'), parameters('environment'))]"
           },
           "allowedIssuerThumbprints": {
             "value": "[parameters('allowedIssuerThumbprints')]"
@@ -1383,8 +1399,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "1907507226368136151"
+              "version": "0.42.1.51946",
+              "templateHash": "7304197934601575633"
             }
           },
           "parameters": {
@@ -1393,9 +1409,6 @@
             },
             "appConfigName": {
               "type": "string"
-            },
-            "serviceBusConnectionString": {
-              "type": "securestring"
             },
             "logAnalyticsSharedKey": {
               "type": "securestring"
@@ -1422,14 +1435,6 @@
             }
           },
           "resources": [
-            {
-              "type": "Microsoft.KeyVault/vaults/secrets",
-              "apiVersion": "2023-07-01",
-              "name": "[format('{0}/{1}', parameters('keyVaultName'), 'ServiceBusConnection')]",
-              "properties": {
-                "value": "[parameters('serviceBusConnectionString')]"
-              }
-            },
             {
               "type": "Microsoft.KeyVault/vaults/secrets",
               "apiVersion": "2023-07-01",
@@ -1501,18 +1506,6 @@
               "properties": {
                 "value": "[parameters('passwordExpiryStorageAccountName')]"
               }
-            },
-            {
-              "type": "Microsoft.AppConfiguration/configurationStores/keyValues",
-              "apiVersion": "2023-03-01",
-              "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:ServiceBus:ConnectionString')]",
-              "properties": {
-                "value": "[format('{{\"uri\":\"{0}\"}}', reference(resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'ServiceBusConnection'), '2023-07-01').secretUri)]",
-                "contentType": "application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8"
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'ServiceBusConnection')]"
-              ]
             },
             {
               "type": "Microsoft.AppConfiguration/configurationStores/keyValues",

@@ -6,8 +6,6 @@ param keyVaultName string
 param appConfigName string
 
 @secure()
-param serviceBusConnectionString string
-@secure()
 param logAnalyticsSharedKey string
 param logAnalyticsWorkspaceId string
 param serviceBusQueueName string
@@ -21,12 +19,6 @@ param allowedIssuerThumbprints string = ''
 // ---- Key Vault secrets ----
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
-}
-
-resource secretSbConn 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: kv
-  name: 'ServiceBusConnection'
-  properties: { value: serviceBusConnectionString }
 }
 
 resource secretLaKey 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
@@ -89,15 +81,6 @@ resource cfgPwdExpiryStorage 'Microsoft.AppConfiguration/configurationStores/key
 }
 
 // Key Vault references in App Configuration (so Functions can read everything from App Config)
-resource cfgRefSbConn 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
-  parent: appConfig
-  name: 'IntuneUp:ServiceBus:ConnectionString'
-  properties: {
-    value: '{"uri":"${secretSbConn.properties.secretUri}"}'
-    contentType: 'application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8'
-  }
-}
-
 resource cfgRefLaKey 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig
   name: 'IntuneUp:LogAnalytics:SharedKey'
