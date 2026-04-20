@@ -13,7 +13,7 @@
 
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateScript({ $_ -match '^https://' })]
+    [ValidateScript({ $_ -match '^https?://' })]
     [string]$FunctionUrl,
     
     [string]$ResourceGroup = "rg-intuneup-prod",
