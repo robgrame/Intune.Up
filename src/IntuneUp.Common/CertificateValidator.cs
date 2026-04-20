@@ -97,14 +97,27 @@ public sealed class CertificateValidator
         }
 
         // Check issuer thumbprint in chain (skip element[0] which is the leaf/client cert itself)
+        // Special case: for self-signed certs, check if the cert itself is in the allowed list
         bool issuerFound = false;
-        for (int i = 1; i < chain.ChainElements.Count; i++)
+        
+        // Self-signed: check the cert itself
+        if (certificate.Subject == certificate.Issuer &&
+            _allowedIssuerThumbprints.Contains(certificate.Thumbprint.ToUpperInvariant()))
         {
-            var issuerCert = chain.ChainElements[i].Certificate;
-            if (_allowedIssuerThumbprints.Contains(issuerCert.Thumbprint.ToUpperInvariant()))
+            issuerFound = true;
+        }
+        
+        // Check chain for issuer (for non-self-signed certs)
+        if (!issuerFound)
+        {
+            for (int i = 1; i < chain.ChainElements.Count; i++)
             {
-                issuerFound = true;
-                break;
+                var issuerCert = chain.ChainElements[i].Certificate;
+                if (_allowedIssuerThumbprints.Contains(issuerCert.Thumbprint.ToUpperInvariant()))
+                {
+                    issuerFound = true;
+                    break;
+                }
             }
         }
 

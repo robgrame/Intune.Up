@@ -14,13 +14,26 @@ var builder = FunctionsApplication.CreateBuilder(args);
 var appConfigEndpoint = Environment.GetEnvironmentVariable("APPCONFIG_ENDPOINT");
 if (!string.IsNullOrEmpty(appConfigEndpoint))
 {
-    var credential = new DefaultAzureCredential();
-    builder.Configuration.AddAzureAppConfiguration(options =>
+    try
     {
-        options.Connect(new Uri(appConfigEndpoint), credential)
-               .Select("IntuneUp:*")
-               .ConfigureKeyVault(kv => kv.SetCredential(credential));
-    });
+        var credential = new DefaultAzureCredential();
+        builder.Configuration.AddAzureAppConfiguration(options =>
+        {
+            options.Connect(new Uri(appConfigEndpoint), credential)
+                   .Select("IntuneUp:*")
+                   .ConfigureKeyVault(kv => kv.SetCredential(credential));
+        });
+        System.Diagnostics.Debug.WriteLine($"[STARTUP] App Configuration loaded from {appConfigEndpoint}");
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"[STARTUP ERROR] Failed to load App Configuration: {ex.GetType().Name}: {ex.Message}");
+        throw;
+    }
+}
+else
+{
+    System.Diagnostics.Debug.WriteLine("[STARTUP] APPCONFIG_ENDPOINT not set, using only environment variables");
 }
 
 builder.ConfigureFunctionsWebApplication();
@@ -57,17 +70,27 @@ builder.Services.AddSingleton(sp =>
     var config = sp.GetRequiredService<IConfiguration>();
     var logger = sp.GetRequiredService<ILogger<Program>>();
     
-    var sbConnection = GetConfigValue(config, "IntuneUp:ServiceBus:ConnectionString");
-
-    if (!string.IsNullOrEmpty(sbConnection) && sbConnection.Contains("Endpoint="))
+    try
     {
-        logger.LogInformation("ServiceBusClient: Using connection string from configuration");
-        return new ServiceBusClient(sbConnection);
-    }
+        var sbConnection = GetConfigValue(config, "IntuneUp:ServiceBus:ConnectionString");
+        logger.LogDebug("ServiceBusClient: Connection string = '{Value}'", string.IsNullOrEmpty(sbConnection) ? "NULL" : "SET");
 
-    var sbNamespace = GetConfigValue(config, "IntuneUp:ServiceBus:Namespace", null, "sb-intuneup-dev.servicebus.windows.net");
-    logger.LogInformation("ServiceBusClient: Using namespace {Namespace}", sbNamespace);
-    return new ServiceBusClient(sbNamespace, defaultCredential);
+        if (!string.IsNullOrEmpty(sbConnection) && sbConnection.Contains("Endpoint="))
+        {
+            logger.LogInformation("ServiceBusClient: Using connection string from configuration");
+            return new ServiceBusClient(sbConnection);
+        }
+
+        // Use correct namespace for environment
+        var sbNamespace = GetConfigValue(config, "IntuneUp:ServiceBus:Namespace", null, "sb-intuneup-prod.servicebus.windows.net");
+        logger.LogInformation("ServiceBusClient: Using namespace {Namespace}", sbNamespace);
+        return new ServiceBusClient(sbNamespace, defaultCredential);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "ServiceBusClient: Failed to create client");
+        throw;
+    }
 });
 
 // Register BlobServiceClient (for claim-check pattern)
@@ -76,21 +99,34 @@ builder.Services.AddSingleton(sp =>
     var config = sp.GetRequiredService<IConfiguration>();
     var logger = sp.GetRequiredService<ILogger<Program>>();
     
-    var storageAccountName = GetConfigValue(
-        config, 
-        "IntuneUp:ClaimCheck:StorageAccountName",
-        "AzureWebJobsStorage__accountName"
-    );
+    // Try environment variable first (faster, no App Config needed)
+    var storageAccountName = Environment.GetEnvironmentVariable("IntuneUp__ClaimCheck__StorageAccountName");
+    logger.LogDebug("BlobServiceClient: EnvVar IntuneUp__ClaimCheck__StorageAccountName = '{Value}'", storageAccountName ?? "NULL");
+
+    // Fallback to config if env var not set
+    if (string.IsNullOrWhiteSpace(storageAccountName))
+    {
+        storageAccountName = config["IntuneUp:ClaimCheck:StorageAccountName"];
+        logger.LogDebug("BlobServiceClient: Config IntuneUp:ClaimCheck:StorageAccountName = '{Value}'", storageAccountName ?? "NULL");
+    }
 
     if (string.IsNullOrWhiteSpace(storageAccountName))
     {
-        logger.LogError("BlobServiceClient: Storage account name not found in configuration");
-        throw new InvalidOperationException("IntuneUp:ClaimCheck:StorageAccountName must be configured");
+        logger.LogError("BlobServiceClient: Storage account name not found in environment or configuration");
+        throw new InvalidOperationException("IntuneUp__ClaimCheck__StorageAccountName environment variable or IntuneUp:ClaimCheck:StorageAccountName config must be set");
     }
 
-    var blobUri = new Uri($"https://{storageAccountName}.blob.core.windows.net");
-    logger.LogInformation("BlobServiceClient: Using storage account {StorageAccount}", storageAccountName);
-    return new BlobServiceClient(blobUri, defaultCredential);
+    try
+    {
+        var blobUri = new Uri($"https://{storageAccountName}.blob.core.windows.net");
+        logger.LogInformation("BlobServiceClient: Using storage account {StorageAccount}", storageAccountName);
+        return new BlobServiceClient(blobUri, defaultCredential);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "BlobServiceClient: Failed to create URI from storage account name '{StorageAccount}'", storageAccountName);
+        throw;
+    }
 });
 
 // Register TableServiceClient (for password expiry lookups)
@@ -99,21 +135,34 @@ builder.Services.AddSingleton(sp =>
     var config = sp.GetRequiredService<IConfiguration>();
     var logger = sp.GetRequiredService<ILogger<Program>>();
     
-    var storageAccountName = GetConfigValue(
-        config,
-        "IntuneUp:PasswordExpiry:StorageAccountName",
-        "AzureWebJobsStorage__accountName"
-    );
+    // Try environment variable first (faster, no App Config needed)
+    var storageAccountName = Environment.GetEnvironmentVariable("IntuneUp__PasswordExpiry__StorageAccountName");
+    logger.LogDebug("TableServiceClient: EnvVar IntuneUp__PasswordExpiry__StorageAccountName = '{Value}'", storageAccountName ?? "NULL");
+
+    // Fallback to config if env var not set
+    if (string.IsNullOrWhiteSpace(storageAccountName))
+    {
+        storageAccountName = config["IntuneUp:PasswordExpiry:StorageAccountName"];
+        logger.LogDebug("TableServiceClient: Config IntuneUp:PasswordExpiry:StorageAccountName = '{Value}'", storageAccountName ?? "NULL");
+    }
 
     if (string.IsNullOrWhiteSpace(storageAccountName))
     {
-        logger.LogError("TableServiceClient: Storage account name not found in configuration");
-        throw new InvalidOperationException("IntuneUp:PasswordExpiry:StorageAccountName must be configured");
+        logger.LogError("TableServiceClient: Storage account name not found in environment or configuration");
+        throw new InvalidOperationException("IntuneUp__PasswordExpiry__StorageAccountName environment variable or IntuneUp:PasswordExpiry:StorageAccountName config must be set");
     }
 
-    var tableUri = new Uri($"https://{storageAccountName}.table.core.windows.net");
-    logger.LogInformation("TableServiceClient: Using storage account {StorageAccount}", storageAccountName);
-    return new Azure.Data.Tables.TableServiceClient(tableUri, defaultCredential);
+    try
+    {
+        var tableUri = new Uri($"https://{storageAccountName}.table.core.windows.net");
+        logger.LogInformation("TableServiceClient: Using storage account {StorageAccount}", storageAccountName);
+        return new Azure.Data.Tables.TableServiceClient(tableUri, defaultCredential);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "TableServiceClient: Failed to create URI from storage account name '{StorageAccount}'", storageAccountName);
+        throw;
+    }
 });
 
 builder.Build().Run();
