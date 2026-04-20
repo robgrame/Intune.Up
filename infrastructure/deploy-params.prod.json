@@ -1,0 +1,5 @@
+{
+    "Environment": "prod",
+    "BaseName": "intuneup",
+    "ResourceGroup": "rg-intuneup-prod"
+}
