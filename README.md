@@ -168,6 +168,21 @@ See [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for detailed procedures.
 
 ### Test the Endpoint
 
+#### Local Testing (Development)
+
+```powershell
+# Start local function emulator
+cd src/IntuneUp.Collector.Http
+func start --csharp
+
+# In another terminal: Run test client
+.\test-client-basic.ps1 -FunctionUrl "http://localhost:7071/api/collect"
+
+# Expected output: ✅ Payload accepted (HTTP 202)
+```
+
+#### Production Testing
+
 ```powershell
 # Test with existing certificate (after authorization)
 .\test-client.ps1 `
@@ -181,7 +196,7 @@ See [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for detailed procedures.
   -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect"
 ```
 
-See [TEST-CLIENT.md](TEST-CLIENT.md) for examples and troubleshooting.
+See [TEST-CLIENT.md](TEST-CLIENT.md) for examples and troubleshooting. See [DEPLOYMENT-STATUS.md](DEPLOYMENT-STATUS.md) for latest testing results.
   --resource-group rg-intuneup-dev \
   --template-file infrastructure/bicep/main.bicep \
   --parameters baseName=intuneup environment=dev \
