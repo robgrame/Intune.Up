@@ -226,8 +226,8 @@ module configSeed 'config-seed.bicep' = {
     logAnalyticsSharedKey: logAnalytics.outputs.primarySharedKey
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
-    claimCheckStorageAccountName: 'st${baseName}claimcheck${environment}'
-    passwordExpiryStorageAccountName: 'st${baseName}pwdexp${environment}'
+    claimCheckStorageAccountName: 'st${baseName}cc${environment}'
+    passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
     allowedIssuerThumbprints: allowedIssuerThumbprints
   }
 }
