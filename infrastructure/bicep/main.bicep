@@ -100,8 +100,9 @@ module appInsights 'app-insights.bicep' = {
 }
 
 // ---- Supporting storage accounts (for claim-check, password-expiry) ----
+// Keep names short to stay within 24-character limit
 resource stClaimCheck 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: 'st${baseName}claimcheck${environment}'
+  name: 'st${baseName}cc${environment}'
   location: location
   tags: tags
   sku: { name: 'Standard_LRS' }
@@ -116,7 +117,7 @@ resource stClaimCheck 'Microsoft.Storage/storageAccounts@2023-01-01' = {
 }
 
 resource stPwdExp 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: 'st${baseName}pwdexp${environment}'
+  name: 'st${baseName}pe${environment}'
   location: location
   tags: tags
   sku: { name: 'Standard_LRS' }

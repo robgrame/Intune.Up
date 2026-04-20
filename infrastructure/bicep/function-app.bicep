@@ -90,14 +90,14 @@ resource storageFileRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   }
 }
 
-// App Service Plan (Consumption - serverless, no VM quota required)
+// App Service Plan (Basic B1 - quota available in this subscription)
 resource hostingPlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: 'asp-${name}'
   location: location
   tags: tags
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'B1'
+    tier: 'Basic'
   }
   properties: {}
 }

@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "17043007551472842769"
+      "templateHash": "10146141864684319622"
     }
   },
   "parameters": {
@@ -63,7 +63,7 @@
     {
       "type": "Microsoft.Storage/storageAccounts",
       "apiVersion": "2023-01-01",
-      "name": "[format('st{0}claimcheck{1}', parameters('baseName'), parameters('environment'))]",
+      "name": "[format('st{0}cc{1}', parameters('baseName'), parameters('environment'))]",
       "location": "[parameters('location')]",
       "tags": "[variables('tags')]",
       "sku": {
@@ -81,7 +81,7 @@
     {
       "type": "Microsoft.Storage/storageAccounts",
       "apiVersion": "2023-01-01",
-      "name": "[format('st{0}pwdexp{1}', parameters('baseName'), parameters('environment'))]",
+      "name": "[format('st{0}pe{1}', parameters('baseName'), parameters('environment'))]",
       "location": "[parameters('location')]",
       "tags": "[variables('tags')]",
       "sku": {
@@ -692,7 +692,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "6349828548091514190"
+              "templateHash": "699713543139362920"
             }
           },
           "parameters": {
@@ -832,8 +832,8 @@
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "sku": {
-                "name": "B1",
-                "tier": "Basic"
+                "name": "S1",
+                "tier": "Standard"
               },
               "properties": {}
             },
@@ -850,8 +850,7 @@
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}', parameters('name')))]",
                 "httpsOnly": true,
-                "clientCertEnabled": "[parameters('clientCertEnabled')]",
-                "clientCertMode": "[if(parameters('clientCertEnabled'), 'Required', 'Optional')]",
+                "clientCertEnabled": false,
                 "virtualNetworkSubnetId": "[if(not(empty(parameters('vnetIntegrationSubnetId'))), parameters('vnetIntegrationSubnetId'), null())]",
                 "vnetRouteAllEnabled": "[not(empty(parameters('vnetIntegrationSubnetId')))]",
                 "siteConfig": {
@@ -955,7 +954,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "6349828548091514190"
+              "templateHash": "699713543139362920"
             }
           },
           "parameters": {
@@ -1095,8 +1094,8 @@
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "sku": {
-                "name": "B1",
-                "tier": "Basic"
+                "name": "S1",
+                "tier": "Standard"
               },
               "properties": {}
             },
@@ -1113,8 +1112,7 @@
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}', parameters('name')))]",
                 "httpsOnly": true,
-                "clientCertEnabled": "[parameters('clientCertEnabled')]",
-                "clientCertMode": "[if(parameters('clientCertEnabled'), 'Required', 'Optional')]",
+                "clientCertEnabled": false,
                 "virtualNetworkSubnetId": "[if(not(empty(parameters('vnetIntegrationSubnetId'))), parameters('vnetIntegrationSubnetId'), null())]",
                 "vnetRouteAllEnabled": "[not(empty(parameters('vnetIntegrationSubnetId')))]",
                 "siteConfig": {
