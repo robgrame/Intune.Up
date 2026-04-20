@@ -8,9 +8,15 @@ Cert in LocalMachine\My  --mTLS-->  App Service (clientCertEnabled=true)
                                         |
                                     X-ARR-ClientCert header (base64 cert)
                                         |
-                                    Azure Function valida thumbprint
-                                    vs allowlist in Key Vault
+                                    Azure Function risale la chain X.509
+                                    e valida il thumbprint della CA emittente
+                                    vs AllowedIssuerThumbprints in Key Vault
 ```
+
+> **Nota:** La validazione non controlla il thumbprint del singolo certificato client,
+> ma il thumbprint della **CA che lo ha emesso** (uno qualsiasi nella catena).
+> Questo permette di autorizzare tutti i device con un certificato emesso dalla
+> stessa PKI aziendale configurando la CA una sola volta.
 
 ## Setup passo-passo
 
@@ -45,44 +51,59 @@ Write-Host "Thumbprint: $($cert.Thumbprint)"
 5. Certificate store: **Computer certificate store - Root** (oppure My)
 6. Assegna al gruppo di device target
 
-### 3. Configura il thumbprint nel Key Vault
+### 3. Configura il thumbprint della CA nel Key Vault
+
+> ⚠️ **Importante:** configurare il thumbprint della **CA emittente** (non del certificato client).
+> Per un certificato self-signed, il cert stesso è la propria CA — usare il suo thumbprint.
 
 ```powershell
-# Scrivi il thumbprint nell'allowlist (Key Vault)
+# Scrivi il thumbprint della CA nell'allowlist (Key Vault)
 az keyvault secret set `
     --vault-name kv-intuneup-dev `
-    --name AllowedCertThumbprints `
-    --value "<THUMBPRINT>"
+    --name AllowedIssuerThumbprints `
+    --value "<CA_THUMBPRINT>"
 ```
 
-Per piu certificati (es. rotazione), separa con virgola:
+Per più CA (es. CA intermedia + CA root, oppure rotazione CA):
 ```powershell
 az keyvault secret set `
     --vault-name kv-intuneup-dev `
-    --name AllowedCertThumbprints `
-    --value "<THUMBPRINT_NUOVO>,<THUMBPRINT_VECCHIO>"
+    --name AllowedIssuerThumbprints `
+    --value "<CA_THUMBPRINT_NUOVA>,<CA_THUMBPRINT_VECCHIA>"
 ```
 
 ### 4. Verifica
 
 ```powershell
+# Recupera la function key
+$functionKey = az functionapp keys list -g rg-intuneup-dev -n func-intup-http-dev `
+    --query "functionKeys.default" -o tsv
+
 # Test da un device con il certificato installato
 $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -like "*IntuneUp*" }
 
 Invoke-RestMethod `
-    -Uri "https://func-intuneup-http-dev.azurewebsites.net/api/collect" `
+    -Uri "https://func-intup-http-dev.azurewebsites.net/api/collect" `
     -Method Post `
     -Certificate $cert `
+    -Headers @{ "x-functions-key" = $functionKey } `
     -ContentType "application/json" `
     -Body '{"DeviceId":"test","DeviceName":"TEST-PC","UseCase":"Test","Data":{}}'
 ```
 
 ## Rotazione certificati
 
-1. Genera nuovo certificato
-2. Distribuiscilo via Intune (nuovo profilo PKCS)
-3. Aggiungi il nuovo thumbprint al Key Vault (mantieni anche il vecchio)
-4. Dopo che tutti i device hanno il nuovo cert, rimuovi il vecchio thumbprint
+La rotazione riguarda la **CA emittente** (raro) o i **certificati client** (frequente con SCEP).
+
+### Rotazione certificati client (PKI/SCEP)
+Con SCEP/PKCS la CA rimane la stessa → nessuna modifica al Key Vault necessaria.
+Intune gestisce il rinnovo automaticamente.
+
+### Rotazione CA (es. migrazione PKI)
+1. Genera/ottieni il thumbprint della nuova CA
+2. Aggiungi il nuovo thumbprint al Key Vault (mantieni anche il vecchio per coesistenza)
+3. Distribuisci i nuovi certificati client firmati dalla nuova CA via Intune
+4. Dopo che tutti i device hanno il nuovo cert, rimuovi il thumbprint della vecchia CA
 
 ## Produzione
 

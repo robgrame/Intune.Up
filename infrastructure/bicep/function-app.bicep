@@ -118,7 +118,8 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
     virtualNetworkSubnetId: !empty(vnetIntegrationSubnetId) ? vnetIntegrationSubnetId : null
     vnetRouteAllEnabled: !empty(vnetIntegrationSubnetId)
     siteConfig: {
-      powerShellVersion: '7.4'
+      netFrameworkVersion: 'v10.0'
+      use32BitWorkerProcess: false
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       appSettings: concat([
@@ -132,7 +133,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'powershell'
+          value: 'dotnet-isolated'
         }
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
