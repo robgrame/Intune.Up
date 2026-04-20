@@ -94,7 +94,7 @@ module appInsights 'app-insights.bicep' = {
   params: {
     name: 'appi-${baseName}-${environment}'
     location: location
-    workspaceId: logAnalytics.outputs.workspaceId
+    workspaceId: logAnalytics.outputs.workspaceResourceId
     tags: tags
   }
 }
