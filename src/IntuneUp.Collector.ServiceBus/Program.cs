@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -30,15 +31,48 @@ builder.Services
 // HttpClient for Log Analytics Data Collector API
 builder.Services.AddHttpClient("LogAnalytics");
 
+// Helper: Get config value with fallback and validation
+static string GetConfigValue(IConfiguration config, string key, string? envVarName = null, string? defaultValue = null)
+{
+    // Try config first (highest priority)
+    var value = config[key];
+    if (!string.IsNullOrWhiteSpace(value))
+        return value;
+
+    // Try environment variable
+    if (!string.IsNullOrEmpty(envVarName))
+    {
+        value = Environment.GetEnvironmentVariable(envVarName);
+        if (!string.IsNullOrWhiteSpace(value))
+            return value;
+    }
+
+    // Return default or empty
+    return defaultValue ?? string.Empty;
+}
+
 // BlobServiceClient for claim-check pattern
 var defaultCredential = new DefaultAzureCredential();
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    var storageAccountName = config["IntuneUp:ClaimCheck:StorageAccountName"]
-        ?? Environment.GetEnvironmentVariable("AzureWebJobsStorage__accountName")
-        ?? "stintuneupclaimcheck";
-    return new BlobServiceClient(new Uri($"https://{storageAccountName}.blob.core.windows.net"), defaultCredential);
+    var logger = sp.GetRequiredService<ILogger<Program>>();
+    
+    var storageAccountName = GetConfigValue(
+        config,
+        "IntuneUp:ClaimCheck:StorageAccountName",
+        "AzureWebJobsStorage__accountName"
+    );
+
+    if (string.IsNullOrWhiteSpace(storageAccountName))
+    {
+        logger.LogError("BlobServiceClient: Storage account name not found in configuration");
+        throw new InvalidOperationException("IntuneUp:ClaimCheck:StorageAccountName must be configured");
+    }
+
+    var blobUri = new Uri($"https://{storageAccountName}.blob.core.windows.net");
+    logger.LogInformation("BlobServiceClient: Using storage account {StorageAccount}", storageAccountName);
+    return new BlobServiceClient(blobUri, defaultCredential);
 });
 
 builder.Build().Run();
