@@ -6,6 +6,10 @@
 .PARAMETER Environment
     Target environment: dev, test, prod (default: dev)
 
+.PARAMETER Location
+    Azure region for deployment (default: westeurope)
+    Note: Use westeurope for this subscription (VM quota in eastus is limited)
+
 .PARAMETER ResourceGroup
     Azure Resource Group (default: rg-intuneup-<Environment>)
 
@@ -28,12 +32,15 @@
 .EXAMPLE
     .\deploy.ps1 -Environment dev -AllowedIssuerThumbprints 'ABC123...'
     .\deploy.ps1 -Environment dev -SkipBuild
+    .\deploy.ps1 -Environment prod -Location westeurope
     .\deploy.ps1 -Environment dev -SkipBicep -SkipBuild
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('dev','test','prod')]
     [string]$Environment = 'dev',
+
+    [string]$Location = 'westeurope',
 
     [string]$ResourceGroup = '',
 
@@ -76,6 +83,7 @@ Write-Host '=============================================' -ForegroundColor Dark
 Write-Host '   Intune.Up - Full Deploy Script           ' -ForegroundColor DarkCyan
 Write-Host '=============================================' -ForegroundColor DarkCyan
 Write-Host "  Environment   : $Environment"
+Write-Host "  Location      : $Location"
 Write-Host "  ResourceGroup : $ResourceGroup"
 Write-Host "  BaseName      : $BaseName"
 Write-Host "  HTTP Function : $FuncHttp"
@@ -111,8 +119,13 @@ if (-not $SkipBuild) {
 }
 
 $rgExists = az group exists --name $ResourceGroup
-if ($rgExists -ne 'true') { Write-Fail "Resource group '$ResourceGroup' not found." }
-Write-Ok "Resource group: $ResourceGroup"
+if ($rgExists -ne 'true') { 
+    Write-Step "Creating resource group: $ResourceGroup in $Location"
+    az group create --name $ResourceGroup --location $Location --output none
+    Write-Ok "Resource group created: $ResourceGroup"
+} else {
+    Write-Ok "Resource group already exists: $ResourceGroup"
+}
 
 if ((-not $SkipBicep) -and (-not $AllowedIssuerThumbprints)) {
     Write-Warn 'AllowedIssuerThumbprints not provided.'
@@ -171,13 +184,15 @@ if (-not $SkipBicep) {
 
     Write-Step 'Deploying Bicep infrastructure'
     Write-Host "  Template: $MainBicep"
+    Write-Host "  Location: $Location"
 
     az deployment group create `
         --resource-group $ResourceGroup `
         --template-file  $MainBicep `
-        --parameters     "environment=$Environment" `
-                         "baseName=$BaseName" `
-                         "allowedIssuerThumbprints=$AllowedIssuerThumbprints" `
+        --parameters     environment=$Environment `
+                         baseName=$BaseName `
+                         location=$Location `
+                         allowedIssuerThumbprints=$AllowedIssuerThumbprints `
         --output table
 
     if ($LASTEXITCODE -ne 0) { Write-Fail 'Bicep deployment failed.' }
