@@ -148,6 +148,14 @@ module functionHttp 'function-app.bicep' = {
         value: appConfig.outputs.appConfigEndpoint
       }
       {
+        name: 'IntuneUp__ServiceBus__Namespace'
+        value: '${serviceBus.outputs.namespaceName}.servicebus.windows.net'
+      }
+      {
+        name: 'IntuneUp__ServiceBus__QueueName'
+        value: serviceBus.outputs.queueName
+      }
+      {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
         value: 'InstrumentationKey=${appInsights.outputs.instrumentationKey}'
       }

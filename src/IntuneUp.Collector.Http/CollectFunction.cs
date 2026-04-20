@@ -60,7 +60,7 @@ public sealed class CollectFunction
             };
 
             // Send to Service Bus
-            var queueName = _configuration["IntuneUp:ServiceBus:QueueName"] ?? "intuneupcollect-prod";
+            var queueName = _configuration["IntuneUp:ServiceBus:QueueName"] ?? "device-telemetry";
             var sender = _serviceBusClient.CreateSender(queueName);
             
             var jsonBody = JsonSerializer.Serialize(enriched);

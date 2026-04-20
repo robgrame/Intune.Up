@@ -11,10 +11,13 @@ builder.ConfigureFunctionsWebApplication();
 
 // ServiceBusClient with DefaultAzureCredential (managed identity in prod)
 var defaultCredential = new DefaultAzureCredential();
-var sbNamespace = Environment.GetEnvironmentVariable("IntuneUp__ServiceBus__Namespace")
+var sbNamespace = builder.Configuration["IntuneUp:ServiceBus:Namespace"]
+    ?? Environment.GetEnvironmentVariable("IntuneUp__ServiceBus__Namespace")
     ?? Environment.GetEnvironmentVariable("ServiceBusNamespace")
-    ?? "sb-intuneup-prod.servicebus.windows.net";
+    ?? throw new InvalidOperationException(
+        "Service Bus namespace is not configured. Set app setting 'IntuneUp__ServiceBus__Namespace' " +
+        "to '<namespace>.servicebus.windows.net'.");
 
-builder.Services.AddSingleton(sp => new ServiceBusClient(sbNamespace, defaultCredential));
+builder.Services.AddSingleton(_ => new ServiceBusClient(sbNamespace, defaultCredential));
 
 await builder.Build().RunAsync();
