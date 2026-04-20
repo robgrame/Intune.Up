@@ -1,0 +1,10 @@
+{
+  "description": {
+    "language": "dotnet-isolated",
+    "extensions": [ ".dll" ],
+    "defaultExecutablePath": "dotnet",
+    "defaultWorkerPath": "IntuneUp.Collector.Http.dll",
+    "workerIndexing": "true",
+    "canUsePlaceholder": true
+  }
+}

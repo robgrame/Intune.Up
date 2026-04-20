@@ -89,6 +89,16 @@ module automationAccount 'automation-account.bicep' = {
   }
 }
 
+module appInsights 'app-insights.bicep' = {
+  name: 'app-insights'
+  params: {
+    name: 'appi-${baseName}-${environment}'
+    location: location
+    workspaceId: logAnalytics.outputs.workspaceId
+    tags: tags
+  }
+}
+
 // ---- Step 2: Function Apps (depend on KV for URI in app settings) ----
 
 module functionHttp 'function-app.bicep' = {
@@ -104,6 +114,14 @@ module functionHttp 'function-app.bicep' = {
       {
         name: 'APPCONFIG_ENDPOINT'
         value: appConfig.outputs.appConfigEndpoint
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: 'InstrumentationKey=${appInsights.outputs.instrumentationKey}'
+      }
+      {
+        name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
+        value: '~3'
       }
     ]
   }
@@ -131,6 +149,14 @@ module functionSb 'function-app.bicep' = {
         // Required at runtime startup for SB trigger binding
         name: 'IntuneUp__ServiceBus__QueueName'
         value: serviceBus.outputs.queueName
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: 'InstrumentationKey=${appInsights.outputs.instrumentationKey}'
+      }
+      {
+        name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
+        value: '~3'
       }
     ]
   }
@@ -179,3 +205,5 @@ output serviceBusNamespace string = serviceBus.outputs.namespaceName
 output keyVaultName string = keyVault.outputs.keyVaultName
 output appConfigEndpoint string = appConfig.outputs.appConfigEndpoint
 output automationAccountName string = automationAccount.outputs.automationAccountName
+output appInsightsName string = appInsights.outputs.appInsightsName
+output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey

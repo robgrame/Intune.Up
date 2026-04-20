@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Processor",
+    "scriptFile": "IntuneUp.Collector.ServiceBus.dll",
+    "entryPoint": "IntuneUp.Collector.ServiceBus.ProcessorFunction.Run",
+    "language": "dotnet-isolated",
+    "properties": {
+      "IsCodeless": false
+    },
+    "bindings": [
+      {
+        "name": "message",
+        "direction": "In",
+        "type": "serviceBusTrigger",
+        "queueName": "%IntuneUp__ServiceBus__QueueName%",
+        "connection": "IntuneUp__ServiceBus__Connection",
+        "cardinality": "One",
+        "properties": {
+          "supportsDeferredBinding": "True"
+        }
+      }
+    ]
+  }
+]
