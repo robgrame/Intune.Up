@@ -99,6 +99,37 @@ module appInsights 'app-insights.bicep' = {
   }
 }
 
+// ---- Supporting storage accounts (for claim-check, password-expiry) ----
+resource stClaimCheck 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: 'st${baseName}claimcheck${environment}'
+  location: location
+  tags: tags
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+    allowSharedKeyAccess: false
+    defaultToOAuthAuthentication: true
+  }
+}
+
+resource stPwdExp 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: 'st${baseName}pwdexp${environment}'
+  location: location
+  tags: tags
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+    allowSharedKeyAccess: false
+    defaultToOAuthAuthentication: true
+  }
+}
+
 // ---- Step 2: Function Apps (depend on KV for URI in app settings) ----
 
 module functionHttp 'function-app.bicep' = {
@@ -194,6 +225,8 @@ module configSeed 'config-seed.bicep' = {
     logAnalyticsSharedKey: logAnalytics.outputs.primarySharedKey
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
+    claimCheckStorageAccountName: 'st${baseName}claimcheck${environment}'
+    passwordExpiryStorageAccountName: 'st${baseName}pwdexp${environment}'
     allowedIssuerThumbprints: allowedIssuerThumbprints
   }
 }

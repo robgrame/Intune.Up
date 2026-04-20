@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "18435830165296042898"
+      "templateHash": "17043007551472842769"
     }
   },
   "parameters": {
@@ -60,6 +60,42 @@
     }
   },
   "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[format('st{0}claimcheck{1}', parameters('baseName'), parameters('environment'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "supportsHttpsTrafficOnly": true,
+        "allowSharedKeyAccess": false,
+        "defaultToOAuthAuthentication": true
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[format('st{0}pwdexp{1}', parameters('baseName'), parameters('environment'))]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "supportsHttpsTrafficOnly": true,
+        "allowSharedKeyAccess": false,
+        "defaultToOAuthAuthentication": true
+      }
+    },
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -537,7 +573,7 @@
             "value": "[parameters('location')]"
           },
           "workspaceId": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'log-analytics'), '2025-04-01').outputs.workspaceId.value]"
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'log-analytics'), '2025-04-01').outputs.workspaceResourceId.value]"
           },
           "tags": {
             "value": "[variables('tags')]"
@@ -1333,6 +1369,12 @@
           "serviceBusQueueName": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
           },
+          "claimCheckStorageAccountName": {
+            "value": "[format('st{0}claimcheck{1}', parameters('baseName'), parameters('environment'))]"
+          },
+          "passwordExpiryStorageAccountName": {
+            "value": "[format('st{0}pwdexp{1}', parameters('baseName'), parameters('environment'))]"
+          },
           "allowedIssuerThumbprints": {
             "value": "[parameters('allowedIssuerThumbprints')]"
           }
@@ -1344,7 +1386,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.40.2.10011",
-              "templateHash": "4810616745743680770"
+              "templateHash": "1907507226368136151"
             }
           },
           "parameters": {
@@ -1369,6 +1411,12 @@
             "logTablePrefix": {
               "type": "string",
               "defaultValue": "IntuneUp"
+            },
+            "claimCheckStorageAccountName": {
+              "type": "string"
+            },
+            "passwordExpiryStorageAccountName": {
+              "type": "string"
             },
             "allowedIssuerThumbprints": {
               "type": "securestring",
@@ -1437,7 +1485,7 @@
               "apiVersion": "2023-03-01",
               "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:ClaimCheck:StorageAccountName')]",
               "properties": {
-                "value": ""
+                "value": "[parameters('claimCheckStorageAccountName')]"
               }
             },
             {
@@ -1453,7 +1501,7 @@
               "apiVersion": "2023-03-01",
               "name": "[format('{0}/{1}', parameters('appConfigName'), 'IntuneUp:PasswordExpiry:StorageAccountName')]",
               "properties": {
-                "value": ""
+                "value": "[parameters('passwordExpiryStorageAccountName')]"
               }
             },
             {

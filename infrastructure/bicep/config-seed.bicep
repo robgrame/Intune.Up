@@ -12,6 +12,8 @@ param logAnalyticsSharedKey string
 param logAnalyticsWorkspaceId string
 param serviceBusQueueName string
 param logTablePrefix string = 'IntuneUp'
+param claimCheckStorageAccountName string
+param passwordExpiryStorageAccountName string
 
 @secure()
 param allowedIssuerThumbprints string = ''
@@ -71,7 +73,7 @@ resource cfgClaimCheckContainer 'Microsoft.AppConfiguration/configurationStores/
 resource cfgClaimCheckStorage 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig
   name: 'IntuneUp:ClaimCheck:StorageAccountName'
-  properties: { value: '' }  // defaults to Function's own storage account
+  properties: { value: claimCheckStorageAccountName }
 }
 
 resource cfgPwdExpiryTable 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
@@ -83,7 +85,7 @@ resource cfgPwdExpiryTable 'Microsoft.AppConfiguration/configurationStores/keyVa
 resource cfgPwdExpiryStorage 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig
   name: 'IntuneUp:PasswordExpiry:StorageAccountName'
-  properties: { value: '' }  // defaults to SB Function's storage account
+  properties: { value: passwordExpiryStorageAccountName }
 }
 
 // Key Vault references in App Configuration (so Functions can read everything from App Config)
