@@ -145,9 +145,43 @@ Intune.Up/
 
 ```bash
 az login
-az group create --name rg-intuneup-dev --location westeurope
+az group create --name rg-intuneup-prod --location westeurope
 
 az deployment group create \
+  --resource-group rg-intuneup-prod \
+  --template-file infrastructure/bicep/main.bicep \
+  --parameters environment=prod
+```
+
+### Complete mTLS Setup (Admin Only)
+
+After deploying infrastructure, the HTTP Function requires certificate authorization:
+
+```powershell
+# Admin authorizes the test certificate
+.\authorize-certificate.ps1 `
+  -KeyVaultName "kv-intuneup-prod" `
+  -Thumbprint "4E050ADBD50A4132C1CC2B237929E113431993D2"
+```
+
+See [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for detailed procedures.
+
+### Test the Endpoint
+
+```powershell
+# Test with existing certificate (after authorization)
+.\test-client.ps1 `
+  -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect" `
+  -ResourceGroup "rg-intuneup-prod" `
+  -FunctionAppName "func-intuneup-http-prod" `
+  -SkipCertSetup
+
+# Basic connectivity check (no mTLS)
+.\test-client-basic.ps1 `
+  -FunctionUrl "https://func-intuneup-http-prod.azurewebsites.net/api/collect"
+```
+
+See [TEST-CLIENT.md](TEST-CLIENT.md) for examples and troubleshooting.
   --resource-group rg-intuneup-dev \
   --template-file infrastructure/bicep/main.bicep \
   --parameters baseName=intuneup environment=dev \
