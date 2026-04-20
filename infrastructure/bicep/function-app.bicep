@@ -90,14 +90,14 @@ resource storageFileRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   }
 }
 
-// App Service Plan (Dedicated B1 - supports MI-based storage, no file share required)
+// App Service Plan (Consumption - serverless, no VM quota required)
 resource hostingPlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: 'asp-${name}'
   location: location
   tags: tags
   sku: {
-    name: 'B1'
-    tier: 'Basic'
+    name: 'Y1'
+    tier: 'Dynamic'
   }
   properties: {}
 }
