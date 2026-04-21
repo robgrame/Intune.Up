@@ -223,17 +223,17 @@ try {
 
 # ========== SUMMARY ==========
 Write-Host ""
-$summaryColor = if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"}
+$summaryColor = $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
 Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor $summaryColor
 Write-Host "║             TEST RESULTS                           ║" -ForegroundColor $summaryColor
 Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor $summaryColor
 Write-Host ""
 
-$s1Icon = if ($testResults.Step1) {'  ✅'} else {'  ❌'}; $s1Color = if ($testResults.Step1) {"Green"} else {"Red"}
-$s2Icon = if ($testResults.Step2) {'  ✅'} else {'  ❌'}; $s2Color = if ($testResults.Step2) {"Green"} else {"Red"}
-$s3Icon = if ($testResults.Step3) {'  ✅'} else {'  ❌'}; $s3Color = if ($testResults.Step3) {"Green"} else {"Red"}
-$s4Icon = if ($testResults.Step4) {'  ✅'} else {'  ⏳'}; $s4Color = if ($testResults.Step4) {"Green"} else {"Yellow"}
-$s5Icon = if ($testResults.Step5) {'  ✅'} else {'  ⏳'}; $s5Color = if ($testResults.Step5) {"Green"} else {"Yellow"}
+$s1Icon = $(if ($testResults.Step1) {'  ✅'} else {'  ❌'}); $s1Color = $(if ($testResults.Step1) {"Green"} else {"Red"})
+$s2Icon = $(if ($testResults.Step2) {'  ✅'} else {'  ❌'}); $s2Color = $(if ($testResults.Step2) {"Green"} else {"Red"})
+$s3Icon = $(if ($testResults.Step3) {'  ✅'} else {'  ❌'}); $s3Color = $(if ($testResults.Step3) {"Green"} else {"Red"})
+$s4Icon = $(if ($testResults.Step4) {'  ✅'} else {'  ⏳'}); $s4Color = $(if ($testResults.Step4) {"Green"} else {"Yellow"})
+$s5Icon = $(if ($testResults.Step5) {'  ✅'} else {'  ⏳'}); $s5Color = $(if ($testResults.Step5) {"Green"} else {"Yellow"})
 
 Write-Host "$s1Icon STEP 1: HTTP Function - 202 Accepted" -ForegroundColor $s1Color
 Write-Host "$s2Icon STEP 2: Processing wait" -ForegroundColor $s2Color

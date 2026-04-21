@@ -105,7 +105,7 @@ Write-Host "  Environment   : $Environment"
 Write-Host "  Location      : $Location"
 Write-Host "  ResourceGroup : $ResourceGroup"
 Write-Host "  BaseName      : $BaseName"
-$subDisplay = if ($SubscriptionId) { $SubscriptionId } else { '(current default)' }
+$subDisplay = $(if ($SubscriptionId) { $SubscriptionId } else { '(current default)' })
 Write-Host "  Subscription  : $subDisplay"
 Write-Host "  HTTP Function : $FuncHttp"
 Write-Host "  SB Function   : $FuncSb"
