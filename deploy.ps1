@@ -61,8 +61,12 @@ function Write-Ok   { param([string]$m) Write-Host "   OK  $m" -ForegroundColor 
 function Write-Warn { param([string]$m) Write-Host "   WARN $m" -ForegroundColor Yellow }
 function Write-Fail { param([string]$m) Write-Host "   FAIL $m" -ForegroundColor Red; exit 1 }
 
-# Derived paths and names
+# Derived paths and names — force lowercase for Azure resource naming consistency
+$BaseName    = $BaseName.ToLower()
+$Environment = $Environment.ToLower()
+$Location    = $Location.ToLower()
 if (-not $ResourceGroup) { $ResourceGroup = "rg-$BaseName-$Environment" }
+$ResourceGroup = $ResourceGroup.ToLower()
 
 $RepoRoot    = $PSScriptRoot
 $SrcDir      = Join-Path $RepoRoot 'src'
