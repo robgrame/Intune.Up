@@ -43,9 +43,11 @@ if ($SubscriptionId) {
     $subParam = @('--subscription', $SubscriptionId)
 }
 
+$ScriptVersion = (Get-Content (Join-Path $PSScriptRoot 'VERSION') -ErrorAction SilentlyContinue).Trim()
+
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  🔑 TEST PASSWORD EXPIRY FLOW" -ForegroundColor Cyan
+Write-Host "  🔑 TEST PASSWORD EXPIRY v$ScriptVersion" -ForegroundColor Cyan
 Write-Host "  Storage: $storageAccount" -ForegroundColor Cyan
 Write-Host "  Function: $funcApp" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan

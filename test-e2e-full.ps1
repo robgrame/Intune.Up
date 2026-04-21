@@ -54,10 +54,12 @@ if ($SubscriptionId) {
 $testResults = @{ Step1 = $false; Step2 = $false; Step3 = $false; Step4 = $false; Step5 = $false }
 $deviceId = "TEST-DEVICE-$(Get-Random -Minimum 10000 -Maximum 99999)"
 $functionKey = $null
+$ScriptVersion = (Get-Content (Join-Path $PSScriptRoot 'VERSION') -ErrorAction SilentlyContinue).Trim()
 
 Write-Host ""
 Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  END-TO-END TEST: Client -> HTTP -> SB -> Log Analytics" -ForegroundColor Cyan
+Write-Host "║  END-TO-END TEST v$ScriptVersion" -ForegroundColor Cyan
+Write-Host "║  Client -> HTTP -> SB -> Log Analytics" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host "  ResourceGroup: $ResourceGroup" -ForegroundColor Gray
 Write-Host "  Function:      $FuncHttpName" -ForegroundColor Gray

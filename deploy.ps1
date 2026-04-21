@@ -95,10 +95,11 @@ $MainBicep   = Join-Path $BicepDir 'main.bicep'
 $FuncHttp    = "func-$BaseName-http-$Environment"
 $FuncSb      = "func-$BaseName-sb-$Environment"
 $AAName      = "aa-$BaseName-$Environment"
+$ScriptVersion = (Get-Content (Join-Path $RepoRoot 'VERSION') -ErrorAction SilentlyContinue).Trim()
 
 Write-Host ''
 Write-Host '=============================================' -ForegroundColor DarkCyan
-Write-Host '   Intune.Up - Full Deploy Script           ' -ForegroundColor DarkCyan
+Write-Host "   Intune.Up - Full Deploy Script  v$ScriptVersion" -ForegroundColor DarkCyan
 Write-Host '=============================================' -ForegroundColor DarkCyan
 Write-Host "  Environment   : $Environment"
 Write-Host "  Location      : $Location"
