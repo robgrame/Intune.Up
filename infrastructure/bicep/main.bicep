@@ -141,7 +141,7 @@ module functionHttp 'function-app.bicep' = {
     location: location
     tags: tags
     keyVaultUri: keyVault.outputs.keyVaultUri
-    clientCertEnabled: true
+    clientCertEnabled: false    // Enable after deployment if mTLS is needed
     extraAppSettings: [
       {
         name: 'APPCONFIG_ENDPOINT'

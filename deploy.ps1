@@ -198,6 +198,11 @@ if (-not $SkipBicep) {
     if ($LASTEXITCODE -ne 0) { Write-Fail 'Bicep deployment failed.' }
     Write-Ok 'Infrastructure deployed'
 
+    Write-Step 'Waiting for RBAC propagation (90 seconds)'
+    Write-Host '  Storage role assignments need time to propagate before function runtime can start.'
+    Start-Sleep -Seconds 90
+    Write-Ok 'RBAC propagation wait complete'
+
 } else {
     Write-Warn 'SkipBicep: infrastructure deployment skipped'
 }
