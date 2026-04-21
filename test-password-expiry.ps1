@@ -69,19 +69,46 @@ $testUsers = @(
 )
 
 foreach ($user in $testUsers) {
-    az storage entity insert `
-        --table-name $tableName `
-        --account-name $storageAccount `
-        --auth-mode login `
-        --entity PartitionKey=PasswordExpiry `
-            RowKey=$($user.upn) `
-            DisplayName=$($user.displayName) `
-            ExpiryDate=$($user.expiryDate) `
-            DaysUntilExpiry=$($user.daysUntilExpiry) `
-            "DaysUntilExpiry@odata.type=Edm.Int32" `
-        -o none 2>$null
+    # Use REST API with OAuth token (az storage entity insert may fail with allowSharedKeyAccess=false)
+    $token = az account get-access-token --resource "https://storage.azure.com/" --query "accessToken" -o tsv
+    $tableUrl = "https://$storageAccount.table.core.windows.net/$tableName"
+    
+    $entity = @{
+        PartitionKey = "PasswordExpiry"
+        RowKey = $user.upn
+        DisplayName = $user.displayName
+        ExpiryDate = $user.expiryDate
+        DaysUntilExpiry = $user.daysUntilExpiry
+    } | ConvertTo-Json
 
-    Write-Host "  ✅ Inserted: $($user.upn) (expires in $($user.daysUntilExpiry) days)" -ForegroundColor Green
+    try {
+        Invoke-RestMethod -Uri $tableUrl -Method POST `
+            -Headers @{ 
+                'Authorization' = "Bearer $token"
+                'Content-Type' = 'application/json'
+                'Accept' = 'application/json;odata=nometadata'
+                'Prefer' = 'return-no-content'
+            } `
+            -Body $entity -ErrorAction Stop | Out-Null
+        
+        Write-Host "  ✅ Inserted: $($user.upn) (expires in $($user.daysUntilExpiry) days)" -ForegroundColor Green
+    } catch {
+        # May already exist — try merge/update
+        $entityUrl = "$tableUrl(PartitionKey='PasswordExpiry',RowKey='$($user.upn)')"
+        try {
+            Invoke-RestMethod -Uri $entityUrl -Method PUT `
+                -Headers @{ 
+                    'Authorization' = "Bearer $token"
+                    'Content-Type' = 'application/json'
+                    'Accept' = 'application/json;odata=nometadata'
+                    'If-Match' = '*'
+                } `
+                -Body $entity -ErrorAction Stop | Out-Null
+            Write-Host "  ✅ Updated: $($user.upn) (expires in $($user.daysUntilExpiry) days)" -ForegroundColor Green
+        } catch {
+            Write-Host "  ❌ Failed to insert $($user.upn): $_" -ForegroundColor Red
+        }
+    }
 }
 
 # ---- STEP 2: Get function key ----

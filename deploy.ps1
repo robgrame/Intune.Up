@@ -202,6 +202,16 @@ if (-not $SkipBicep) {
     if ($LASTEXITCODE -ne 0) { Write-Fail 'Bicep deployment failed.' }
     Write-Ok 'Infrastructure deployed'
 
+    Write-Step 'Assigning deployer RBAC (Table Data Contributor on password-expiry storage)'
+    $deployerObjectId = az ad signed-in-user show --query "id" -o tsv 2>$null
+    $peStorageId = az storage account show -g $ResourceGroup -n "st${BaseName}pe${Environment}" --query "id" -o tsv 2>$null
+    if ($deployerObjectId -and $peStorageId) {
+        az role assignment create --assignee $deployerObjectId --role "Storage Table Data Contributor" --scope $peStorageId -o none 2>$null
+        Write-Ok "Deployer RBAC assigned on password-expiry storage"
+    } else {
+        Write-Warn "Could not assign deployer RBAC (non-blocking)"
+    }
+
     Write-Step 'Waiting for RBAC propagation (90 seconds)'
     Write-Host '  Storage role assignments need time to propagate before function runtime can start.'
     Start-Sleep -Seconds 90
