@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "11757393438024082489"
+      "templateHash": "186988446051060980"
     }
   },
   "parameters": {
@@ -653,7 +653,7 @@
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'key-vault'), '2025-04-01').outputs.keyVaultUri.value]"
           },
           "clientCertEnabled": {
-            "value": true
+            "value": false
           },
           "extraAppSettings": {
             "value": [
@@ -668,6 +668,10 @@
               {
                 "name": "IntuneUp__ServiceBus__QueueName",
                 "value": "[reference(resourceId('Microsoft.Resources/deployments', 'service-bus'), '2025-04-01').outputs.queueName.value]"
+              },
+              {
+                "name": "IntuneUp__PasswordExpiry__StorageAccountName",
+                "value": "[format('st{0}pe{1}', parameters('baseName'), parameters('environment'))]"
               },
               {
                 "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
@@ -1196,6 +1200,9 @@
           },
           "httpStorageAccountName": {
             "value": "[format('st{0}http{1}', parameters('baseName'), parameters('environment'))]"
+          },
+          "passwordExpiryStorageAccountName": {
+            "value": "[format('st{0}pe{1}', parameters('baseName'), parameters('environment'))]"
           }
         },
         "template": {
@@ -1205,7 +1212,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "13300509565633988029"
+              "templateHash": "1521054919300849568"
             }
           },
           "parameters": {
@@ -1237,6 +1244,10 @@
             },
             "logAnalyticsWorkspaceName": {
               "type": "string"
+            },
+            "passwordExpiryStorageAccountName": {
+              "type": "string",
+              "defaultValue": ""
             }
           },
           "variables": {
@@ -1335,14 +1346,26 @@
               }
             },
             {
-              "condition": "[and(not(empty(parameters('automationAccountPrincipalId'))), not(empty(parameters('httpStorageAccountName'))))]",
+              "condition": "[and(not(empty(parameters('automationAccountPrincipalId'))), not(empty(parameters('passwordExpiryStorageAccountName'))))]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('httpStorageAccountName'))]",
-              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('httpStorageAccountName')), parameters('automationAccountPrincipalId'), variables('storageTableDataContributorRoleId'))]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('passwordExpiryStorageAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('passwordExpiryStorageAccountName')), parameters('automationAccountPrincipalId'), variables('storageTableDataContributorRoleId'))]",
               "properties": {
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageTableDataContributorRoleId'))]",
                 "principalId": "[parameters('automationAccountPrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('passwordExpiryStorageAccountName')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('passwordExpiryStorageAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('passwordExpiryStorageAccountName')), parameters('httpFunctionPrincipalId'), variables('storageTableDataContributorRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageTableDataContributorRoleId'))]",
+                "principalId": "[parameters('httpFunctionPrincipalId')]",
                 "principalType": "ServicePrincipal"
               }
             }
