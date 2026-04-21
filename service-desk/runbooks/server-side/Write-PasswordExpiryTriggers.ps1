@@ -18,34 +18,60 @@
       - Moduli: Az.Storage, Microsoft.Graph.Authentication, Microsoft.Graph.Users
 #>
 
-#Requires -Modules Az.Storage, Microsoft.Graph.Authentication, Microsoft.Graph.Users
+#Requires -Modules Microsoft.Graph.Authentication, Microsoft.Graph.Users
 
 param(
     [int]$ThresholdDays = 10,
-    [string]$StorageAccountName = "stintuneupsbdev",
+    [string]$StorageAccountName,
     [string]$TableName = "PasswordExpiry"
 )
 
 $ErrorActionPreference = "Stop"
 
+if (-not $StorageAccountName) {
+    throw "StorageAccountName parameter is required. Set it in the Automation Account job schedule."
+}
+
 # Autenticazione tramite Managed Identity
 Connect-MgGraph -Identity -NoWelcome
 Connect-AzAccount -Identity | Out-Null
 
-# Crea la tabella se non esiste
-$ctx = (Get-AzStorageAccount -ResourceGroupName "rg-intuneup-dev" -Name $StorageAccountName).Context
-$table = Get-AzStorageTable -Name $TableName -Context $ctx -ErrorAction SilentlyContinue
-if (-not $table) {
-    $table = New-AzStorageTable -Name $TableName -Context $ctx
+# Accedi al Table Storage tramite OAuth (allowSharedKeyAccess=false)
+$token = (Get-AzAccessToken -ResourceUrl "https://storage.azure.com/").Token
+$tableUrl = "https://$StorageAccountName.table.core.windows.net/$TableName"
+$headers = @{
+    'Authorization' = "Bearer $token"
+    'Content-Type'  = 'application/json'
+    'Accept'        = 'application/json;odata=nometadata'
+    'x-ms-version'  = '2020-12-06'
 }
-$cloudTable = $table.CloudTable
 
-# Pulisci vecchi record (quelli scritti >2 giorni fa)
-$oldEntities = Get-AzTableRow -Table $cloudTable -PartitionKey "PasswordExpiry"
-foreach ($entity in $oldEntities) {
-    Remove-AzTableRow -Table $cloudTable -PartitionKey $entity.PartitionKey -RowKey $entity.RowKey -Confirm:$false | Out-Null
+# Crea la tabella se non esiste
+try {
+    Invoke-RestMethod -Uri "https://$StorageAccountName.table.core.windows.net/Tables" `
+        -Method POST -Headers $headers `
+        -Body (@{ TableName = $TableName } | ConvertTo-Json) -ErrorAction Stop | Out-Null
+    Write-Output "Table '$TableName' created"
+} catch {
+    if ($_.Exception.Message -notmatch "TableAlreadyExists") {
+        Write-Output "Table '$TableName' already exists"
+    }
 }
-Write-Output "Cleaned $($oldEntities.Count) old records"
+
+# Pulisci vecchi record
+Write-Output "Cleaning old records..."
+try {
+    $existing = Invoke-RestMethod -Uri "$tableUrl()" -Method GET -Headers $headers
+    foreach ($entity in $existing.value) {
+        $deleteUrl = "$tableUrl(PartitionKey='$($entity.PartitionKey)',RowKey='$($entity.RowKey)')"
+        $deleteHeaders = $headers.Clone()
+        $deleteHeaders['If-Match'] = '*'
+        Invoke-RestMethod -Uri $deleteUrl -Method DELETE -Headers $deleteHeaders -ErrorAction SilentlyContinue | Out-Null
+    }
+    Write-Output "Cleaned $($existing.value.Count) old records"
+} catch {
+    Write-Output "No existing records to clean"
+}
 
 # Query utenti con password in scadenza
 $today      = (Get-Date).ToUniversalTime()
@@ -72,17 +98,24 @@ foreach ($user in $users) {
     $expiryDate = $user.LastPasswordChangeDateTime.AddDays($passwordMaxAgeDays)
     $daysUntilExpiry = [math]::Round(($expiryDate - $today).TotalDays, 0)
 
-    $props = @{
+    $entity = @{
+        PartitionKey    = "PasswordExpiry"
+        RowKey          = $user.UserPrincipalName.ToLower()
         DaysUntilExpiry = $daysUntilExpiry
         UserUPN         = $user.UserPrincipalName
-        ExpiryDate      = $expiryDate.ToString("o")
+        ExpiryDate      = $expiryDate.ToString("yyyy-MM-dd")
         WrittenAt       = $today.ToString("o")
-    }
+    } | ConvertTo-Json
 
-    Add-AzTableRow -Table $cloudTable `
-        -PartitionKey "PasswordExpiry" `
-        -RowKey $user.UserPrincipalName.ToLower() `
-        -Property $props | Out-Null
+    try {
+        Invoke-RestMethod -Uri $tableUrl -Method POST -Headers $headers -Body $entity -ErrorAction Stop | Out-Null
+    } catch {
+        # Entity may already exist — update it
+        $entityUrl = "$tableUrl(PartitionKey='PasswordExpiry',RowKey='$($user.UserPrincipalName.ToLower())')"
+        $updateHeaders = $headers.Clone()
+        $updateHeaders['If-Match'] = '*'
+        Invoke-RestMethod -Uri $entityUrl -Method PUT -Headers $updateHeaders -Body $entity | Out-Null
+    }
 
     $written++
 }

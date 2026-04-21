@@ -261,6 +261,36 @@ if (-not $SkipFunctionDeploy) {
 }
 
 # --------------------------------------------------------------------------
+# Step 4: Deploy Automation Runbook content
+# --------------------------------------------------------------------------
+$runbookScript = Join-Path $RepoRoot 'service-desk\runbooks\server-side\Write-PasswordExpiryTriggers.ps1'
+$aaName = "aa-$BaseName-$Environment"
+
+if (Test-Path $runbookScript) {
+    Write-Step "Deploying Automation Runbook: Write-PasswordExpiryTriggers"
+
+    az automation runbook replace-content `
+        --resource-group $ResourceGroup `
+        --automation-account-name $aaName `
+        --name 'Write-PasswordExpiryTriggers' `
+        --content "@$runbookScript" `
+        -o none 2>$null
+
+    if ($LASTEXITCODE -eq 0) {
+        az automation runbook publish `
+            --resource-group $ResourceGroup `
+            --automation-account-name $aaName `
+            --name 'Write-PasswordExpiryTriggers' `
+            -o none 2>$null
+        Write-Ok "Runbook published"
+    } else {
+        Write-Warn "Runbook content upload failed (non-blocking)"
+    }
+} else {
+    Write-Warn "Runbook script not found at $runbookScript"
+}
+
+# --------------------------------------------------------------------------
 # Summary
 # --------------------------------------------------------------------------
 Write-Host ''
