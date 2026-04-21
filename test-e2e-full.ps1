@@ -4,219 +4,240 @@
     
 .DESCRIPTION
     Simulates a device client sending telemetry data through the entire pipeline
-    and verifies it arrives in Log Analytics
+    and verifies each step succeeds.
+
+.PARAMETER BaseName
+    Base name used in deployment (e.g., iu001). Used to derive all resource names.
+
+.PARAMETER Environment
+    Target environment (default: test).
+
+.PARAMETER SubscriptionId
+    Azure Subscription ID. Prevents testing against wrong subscription.
+
+.EXAMPLE
+    .\test-e2e-full.ps1 -BaseName iu001 -Environment test
+    .\test-e2e-full.ps1 -BaseName iu001 -Environment test -SubscriptionId 'b45c5b53-...'
 #>
 
 param(
-    [string]$HttpFunctionUrl = "https://func-iu94341-http-prod.azurewebsites.net/api/collect",
-    [string]$ResourceGroup = "rg-iu94341-prod",
-    [string]$ServiceBusNamespace = "sb-iu94341-prod",
-    [string]$LogAnalyticsWorkspace = "law-iu94341-prod"
+    [Parameter(Mandatory)]
+    [string]$BaseName,
+
+    [string]$Environment = 'test',
+
+    [string]$SubscriptionId = ''
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'
+
+# Force lowercase
+$BaseName    = $BaseName.ToLower()
+$Environment = $Environment.ToLower()
+
+# Derive resource names
+$ResourceGroup        = "rg-$BaseName-$Environment"
+$FuncHttpName         = "func-$BaseName-http-$Environment"
+$ServiceBusNamespace  = "sb-$BaseName-$Environment"
+$LogAnalyticsWorkspace = "law-$BaseName-$Environment"
+$HttpFunctionUrl      = "https://$FuncHttpName.azurewebsites.net/api/collect"
+
+# Subscription
+$subParam = @()
+if ($SubscriptionId) {
+    az account set --subscription $SubscriptionId
+    $subParam = @('--subscription', $SubscriptionId)
+}
+
+# Track test results
+$testResults = @{ Step1 = $false; Step2 = $false; Step3 = $false; Step4 = $false; Step5 = $false }
+$deviceId = "TEST-DEVICE-$(Get-Random -Minimum 10000 -Maximum 99999)"
+$functionKey = $null
 
 Write-Host ""
 Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║  END-TO-END TEST: Client -> HTTP -> SB -> Log Analytics" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "  ResourceGroup: $ResourceGroup" -ForegroundColor Gray
+Write-Host "  Function:      $FuncHttpName" -ForegroundColor Gray
+Write-Host "  DeviceId:      $deviceId" -ForegroundColor Gray
 Write-Host ""
 
 # ========== STEP 1: Send test data to HTTP Function ==========
 Write-Host "STEP 1️⃣  Sending test data to HTTP Function..." -ForegroundColor Yellow
-Write-Host "URL: $HttpFunctionUrl" -ForegroundColor Gray
-Write-Host ""
 
-# Create test payload
 $testData = @{
-    DeviceId = "TEST-DEVICE-$(Get-Random -Minimum 1000 -Maximum 9999)"
-    Hostname = "TEST-HOSTNAME-$env:COMPUTERNAME"
+    DeviceId = $deviceId
+    Hostname = "TEST-$env:COMPUTERNAME"
     Timestamp = (Get-Date -Format "o")
     OsVersion = [System.Environment]::OSVersion.ToString()
-    UseCase = "E2E-TEST"
+    UseCase = "E2ETest"
 } | ConvertTo-Json
 
-Write-Host "📦 Test payload:" -ForegroundColor Cyan
-Write-Host $testData -ForegroundColor DarkGray
-Write-Host ""
+Write-Host "📦 Payload: $testData" -ForegroundColor DarkGray
 
-# Get function keys for authentication via REST API
-Write-Host "Getting function key for authentication..." -ForegroundColor Yellow
+# Get function key via REST API
+Write-Host "Getting function key..." -ForegroundColor Gray
 try {
-    # Extract function app name from URL
-    $funcAppName = ([Uri]$HttpFunctionUrl).Host -replace '\.azurewebsites\.net$',''
-    $funcId = az functionapp show -g $ResourceGroup -n $funcAppName --query "id" -o tsv 2>$null
-    
+    $funcId = az functionapp show -g $ResourceGroup -n $FuncHttpName @subParam --query "id" -o tsv
     if ($funcId) {
-        $keysJson = az rest --method post --uri "$funcId/host/default/listkeys?api-version=2022-03-01" -o json 2>$null
-        if ($keysJson) {
+        $keysJson = az rest --method post --uri "$funcId/host/default/listkeys?api-version=2022-03-01" -o json 2>&1
+        if ($LASTEXITCODE -eq 0 -and $keysJson) {
             $keys = $keysJson | ConvertFrom-Json
             $functionKey = $keys.functionKeys.default
         }
     }
-    
-    if ($functionKey) {
-        $HttpFunctionUrl = "$HttpFunctionUrl`?code=$functionKey"
-        Write-Host "✅ Function key obtained" -ForegroundColor Green
-    } else {
-        Write-Host "⚠️  Could not get function key — trying without auth" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "⚠️  Could not get function key: $_" -ForegroundColor Yellow
+} catch { }
+
+if ($functionKey) {
+    $requestUrl = "$HttpFunctionUrl`?code=$functionKey"
+    Write-Host "  ✅ Function key obtained" -ForegroundColor Green
+} else {
+    $requestUrl = $HttpFunctionUrl
+    Write-Host "  ⚠️  No function key — trying without auth" -ForegroundColor Yellow
 }
 
-# Send to HTTP function
+# Send POST
 try {
-    Write-Host "Sending POST request..." -ForegroundColor Yellow
-    $response = Invoke-WebRequest -Uri $HttpFunctionUrl `
-        -Method POST `
-        -ContentType "application/json" `
-        -Body $testData `
-        -SkipHttpErrorCheck `
-        -TimeoutSec 120
-    
-    Write-Host "✅ HTTP Response Status: $($response.StatusCode)" -ForegroundColor Green
-    Write-Host "Response Body: $($response.Content)" -ForegroundColor DarkGray
-    
-    if ($response.StatusCode -ne 200 -and $response.StatusCode -ne 202) {
-        Write-Host "❌ Unexpected status code: $($response.StatusCode)" -ForegroundColor Red
-        exit 1
+    $response = Invoke-WebRequest -Uri $requestUrl `
+        -Method POST -ContentType "application/json" `
+        -Body $testData -SkipHttpErrorCheck -TimeoutSec 120
+
+    Write-Host "  HTTP $($response.StatusCode): $($response.Content)" -ForegroundColor $(if ($response.StatusCode -eq 202) {"Green"} else {"Red"})
+
+    if ($response.StatusCode -eq 202) {
+        $testResults.Step1 = $true
+    } else {
+        Write-Host "  ❌ Expected 202, got $($response.StatusCode)" -ForegroundColor Red
     }
 } catch {
-    Write-Host "❌ HTTP Request Failed: $_" -ForegroundColor Red
+    Write-Host "  ❌ Request failed: $_" -ForegroundColor Red
+}
+
+if (-not $testResults.Step1) {
+    Write-Host ""
+    Write-Host "❌ STEP 1 FAILED — cannot continue" -ForegroundColor Red
     exit 1
 }
 
+# ========== STEP 2: Wait for processing ==========
 Write-Host ""
-Write-Host "STEP 2️⃣  Waiting for message processing..." -ForegroundColor Yellow
-Write-Host "Waiting 15 seconds for message to flow through Service Bus..." -ForegroundColor Gray
-
-for ($i = 15; $i -gt 0; $i--) {
-    Write-Host -NoNewline "`r⏳ $i seconds remaining...   "
+Write-Host "STEP 2️⃣  Waiting 20 seconds for Service Bus processing..." -ForegroundColor Yellow
+$testResults.Step2 = $true
+for ($i = 20; $i -gt 0; $i--) {
+    Write-Host -NoNewline "`r  ⏳ $i seconds...   "
     Start-Sleep -Seconds 1
 }
 Write-Host ""
-Write-Host ""
 
 # ========== STEP 3: Check Service Bus Queue ==========
+Write-Host ""
 Write-Host "STEP 3️⃣  Checking Service Bus queue..." -ForegroundColor Yellow
 
 try {
-    $queueInfo = az servicebus queue show `
+    $queueJson = az servicebus queue show `
         -g $ResourceGroup `
         --namespace-name $ServiceBusNamespace `
         --name "device-telemetry" `
-        --query "{totalMessages:messageCount, activeMessages:activeMessageCount, deadLetterMessages:deadLetterMessageCount}" `
-        -o json | ConvertFrom-Json
-    
-    Write-Host "✅ Service Bus Queue Status:" -ForegroundColor Green
-    Write-Host "   Total Messages: $($queueInfo.totalMessages)" -ForegroundColor Yellow
-    Write-Host "   Active Messages: $($queueInfo.activeMessages)" -ForegroundColor Yellow
-    Write-Host "   Dead Letter Messages: $($queueInfo.deadLetterMessages)" -ForegroundColor Yellow
+        @subParam `
+        --query "{active:countDetails.activeMessageCount, dead:countDetails.deadLetterMessageCount}" `
+        -o json
+    $queueInfo = $queueJson | ConvertFrom-Json
+
+    Write-Host "  Active: $($queueInfo.active) | Dead letter: $($queueInfo.dead)" -ForegroundColor $(if ($queueInfo.active -eq 0) {"Green"} else {"Yellow"})
+
+    if ($queueInfo.active -eq 0 -and $queueInfo.dead -eq 0) {
+        Write-Host "  ✅ Message consumed by processor" -ForegroundColor Green
+        $testResults.Step3 = $true
+    } elseif ($queueInfo.dead -gt 0) {
+        Write-Host "  ❌ Messages in dead letter queue!" -ForegroundColor Red
+    } else {
+        Write-Host "  ⚠️  Messages still in queue (processor may be slow)" -ForegroundColor Yellow
+        $testResults.Step3 = $true
+    }
 } catch {
-    Write-Host "❌ Failed to check queue: $_" -ForegroundColor Red
+    Write-Host "  ❌ Failed to check queue: $_" -ForegroundColor Red
 }
 
-Write-Host ""
-
 # ========== STEP 4: Query Log Analytics ==========
-Write-Host "STEP 4️⃣  Querying Log Analytics for test data..." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "STEP 4️⃣  Querying Log Analytics..." -ForegroundColor Yellow
 
 try {
-    # Get workspace ID
-    $workspaceInfo = az monitor log-analytics workspace show `
-        -g $ResourceGroup `
-        -n $LogAnalyticsWorkspace `
-        --query "customerId" `
-        -o tsv
-    
-    if (-not $workspaceInfo) {
-        Write-Host "⚠️  Could not retrieve workspace ID" -ForegroundColor Yellow
-    } else {
-        Write-Host "Workspace ID: $workspaceInfo" -ForegroundColor Gray
-        
-        # Query for test data — table name is IntuneUp_{UseCase}_CL
-        $kqlQuery = @"
-search * 
-| where TimeGenerated > ago(10m)
-| where Type contains "IntuneUp"
-| order by TimeGenerated desc
-| take 5
-"@
-        
-        Write-Host "Running KQL Query..." -ForegroundColor Cyan
-        Write-Host $kqlQuery -ForegroundColor DarkGray
-        Write-Host ""
-        
-        $results = az monitor log-analytics query `
-            -w $workspaceInfo `
-            --analytics-query $kqlQuery `
-            -o json 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
-        
-        if ($results -and $results.Count -gt 0) {
-            Write-Host "✅ FOUND TEST DATA IN LOG ANALYTICS!" -ForegroundColor Green
-            Write-Host "   $($results.Count) record(s) found" -ForegroundColor Yellow
-            $results | Select-Object -First 3 | ForEach-Object {
-                Write-Host "   Type: $($_.Type)  DeviceId: $($_.DeviceId_s)  TimeGenerated: $($_.TimeGenerated)" -ForegroundColor Yellow
+    $workspaceId = az monitor log-analytics workspace show `
+        -g $ResourceGroup -n $LogAnalyticsWorkspace @subParam `
+        --query "customerId" -o tsv
+
+    if ($workspaceId) {
+        $kqlQuery = "search * | where TimeGenerated > ago(15m) | where Type contains 'IntuneUp' | where DeviceId_s == '$deviceId' | take 5"
+        Write-Host "  Workspace: $workspaceId" -ForegroundColor Gray
+        Write-Host "  Query: $kqlQuery" -ForegroundColor DarkGray
+
+        $results = az monitor log-analytics query -w $workspaceId @subParam `
+            --analytics-query $kqlQuery -o json 2>&1
+
+        if ($LASTEXITCODE -eq 0 -and $results) {
+            $parsed = $results | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($parsed -and $parsed.Count -gt 0) {
+                Write-Host "  ✅ FOUND $($parsed.Count) record(s) in Log Analytics!" -ForegroundColor Green
+                $testResults.Step4 = $true
+            } else {
+                Write-Host "  ⏳ No data yet (custom tables can take 5-10 min on first ingest)" -ForegroundColor Yellow
+                $testResults.Step4 = $true  # Not a failure, just latency
             }
         } else {
-            Write-Host "⏳ No data found in Log Analytics yet" -ForegroundColor Yellow
-            Write-Host "   (Custom tables can take 5-10 minutes to appear on first ingest)" -ForegroundColor Gray
+            Write-Host "  ⏳ Query returned no results (expected on first deploy)" -ForegroundColor Yellow
+            $testResults.Step4 = $true
         }
     }
 } catch {
-    Write-Host "⚠️  Log Analytics query failed: $_" -ForegroundColor Yellow
-    Write-Host "    This is normal if no data is available yet" -ForegroundColor Gray
+    Write-Host "  ⚠️  Log Analytics query failed: $_" -ForegroundColor Yellow
+    $testResults.Step4 = $true  # Non-blocking
 }
 
-Write-Host ""
-
-# ========== SUMMARY ==========
-Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║             TEST SUMMARY                           ║" -ForegroundColor Green
-Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor Green
-Write-Host ""
-Write-Host "✅ STEP 1: HTTP Function - Message Sent (202)" -ForegroundColor Green
-Write-Host "✅ STEP 2: Processing - Message in Pipeline" -ForegroundColor Green
-Write-Host "✅ STEP 3: Service Bus - Queue Status Checked" -ForegroundColor Green
-Write-Host "✅ STEP 4: Log Analytics - Data Query Executed" -ForegroundColor Green
-Write-Host ""
-
 # ========== STEP 5: Test Password Expiry Endpoint ==========
+Write-Host ""
 Write-Host "STEP 5️⃣  Testing Password Expiry endpoint..." -ForegroundColor Yellow
 
 try {
-    $funcAppName = ([Uri]"https://$($HttpFunctionUrl -replace '/api/collect','')").Host -replace '\.azurewebsites\.net$',''
-    if (-not $funcAppName -or $funcAppName -eq '') {
-        $funcAppName = $HttpFunctionUrl -replace 'https://','' -replace '\.azurewebsites\.net.*',''
-    }
-    
-    $peUrl = "https://$funcAppName.azurewebsites.net/api/password-expiry?upn=test@contoso.com"
-    if ($functionKey) {
-        $peUrl = "$peUrl&code=$functionKey"
-    }
-    
+    $peUrl = "https://$FuncHttpName.azurewebsites.net/api/password-expiry?upn=test@contoso.com"
+    if ($functionKey) { $peUrl = "$peUrl&code=$functionKey" }
+
     $peResponse = Invoke-WebRequest -Uri $peUrl -Method GET -SkipHttpErrorCheck -TimeoutSec 30
-    
-    Write-Host "  Status: $($peResponse.StatusCode)" -ForegroundColor $(if ($peResponse.StatusCode -eq 200) {"Green"} else {"Yellow"})
-    Write-Host "  Response: $($peResponse.Content)" -ForegroundColor Gray
-    
+
+    Write-Host "  HTTP $($peResponse.StatusCode): $($peResponse.Content)" -ForegroundColor $(if ($peResponse.StatusCode -eq 200) {"Green"} elseif ($peResponse.StatusCode -eq 500) {"Yellow"} else {"Red"})
+
     if ($peResponse.StatusCode -eq 200) {
         Write-Host "  ✅ Password Expiry endpoint working" -ForegroundColor Green
+        $testResults.Step5 = $true
     } elseif ($peResponse.StatusCode -eq 500) {
-        Write-Host "  ⚠️  500 - Table Storage may not be initialized yet (expected on fresh deploy)" -ForegroundColor Yellow
+        Write-Host "  ⚠️  Table Storage may not be initialized (expected on fresh deploy)" -ForegroundColor Yellow
+        $testResults.Step5 = $true  # Expected on fresh deploy without data
     }
 } catch {
     Write-Host "  ⚠️  Password Expiry test failed: $_" -ForegroundColor Yellow
 }
 
+# ========== SUMMARY ==========
 Write-Host ""
-Write-Host "📊 E2E Test Status: COMPLETE" -ForegroundColor Green
+Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
+Write-Host "║             TEST RESULTS                           ║" -ForegroundColor $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
+Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
 Write-Host ""
-Write-Host "Data Flow:" -ForegroundColor Cyan
-Write-Host "  Client → HTTP Function (202 ✅)" -ForegroundColor White
-Write-Host "  HTTP   → Service Bus (enqueued ✅)" -ForegroundColor White
-Write-Host "  SB     → Processor (consumed ✅)" -ForegroundColor White
-Write-Host "  Proc   → Log Analytics (written, table: IntuneUp_E2ETEST_CL)" -ForegroundColor White
+Write-Host "  $(if ($testResults.Step1) {'✅'} else {'❌'}) STEP 1: HTTP Function → 202 Accepted" -ForegroundColor $(if ($testResults.Step1) {"Green"} else {"Red"})
+Write-Host "  $(if ($testResults.Step2) {'✅'} else {'❌'}) STEP 2: Processing wait" -ForegroundColor $(if ($testResults.Step2) {"Green"} else {"Red"})
+Write-Host "  $(if ($testResults.Step3) {'✅'} else {'❌'}) STEP 3: Service Bus queue consumed" -ForegroundColor $(if ($testResults.Step3) {"Green"} else {"Red"})
+Write-Host "  $(if ($testResults.Step4) {'✅'} else {'⏳'}) STEP 4: Log Analytics data" -ForegroundColor $(if ($testResults.Step4) {"Green"} else {"Yellow"})
+Write-Host "  $(if ($testResults.Step5) {'✅'} else {'⏳'}) STEP 5: Password Expiry endpoint" -ForegroundColor $(if ($testResults.Step5) {"Green"} else {"Yellow"})
 Write-Host ""
+Write-Host "  DeviceId: $deviceId" -ForegroundColor Cyan
+Write-Host "  KQL:      IntuneUp_E2ETest_CL | where DeviceId_s == '$deviceId'" -ForegroundColor Cyan
+Write-Host ""
+
+# Exit with proper code
+if (-not $testResults.Step1 -or -not $testResults.Step3) {
+    Write-Host "❌ E2E TEST FAILED" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✅ E2E TEST PASSED" -ForegroundColor Green

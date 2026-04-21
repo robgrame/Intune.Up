@@ -18,19 +18,30 @@
 
 param(
     [Parameter(Mandatory)]
-    [string]$ResourceGroup,
-
-    [Parameter(Mandatory)]
     [string]$BaseName,
 
-    [string]$Environment = 'test'
+    [string]$Environment = 'test',
+
+    [string]$SubscriptionId = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
+# Force lowercase
+$BaseName    = $BaseName.ToLower()
+$Environment = $Environment.ToLower()
+
+$ResourceGroup = "rg-$BaseName-$Environment"
 $storageAccount = "st${BaseName}pe${Environment}"
 $funcApp = "func-${BaseName}-http-${Environment}"
 $tableName = 'PasswordExpiry'
+
+# Subscription
+$subParam = @()
+if ($SubscriptionId) {
+    az account set --subscription $SubscriptionId
+    $subParam = @('--subscription', $SubscriptionId)
+}
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Cyan
@@ -115,8 +126,8 @@ foreach ($user in $testUsers) {
 Write-Host ""
 Write-Host "🔑 STEP 2: Getting function key..." -ForegroundColor Yellow
 
-$funcId = az functionapp show -g $ResourceGroup -n $funcApp --query "id" -o tsv
-$keysJson = az rest --method post --uri "$funcId/host/default/listkeys?api-version=2022-03-01" -o json 2>$null
+$funcId = az functionapp show -g $ResourceGroup -n $funcApp @subParam --query "id" -o tsv
+$keysJson = az rest --method post --uri "$funcId/host/default/listkeys?api-version=2022-03-01" -o json 2>&1
 $keys = $keysJson | ConvertFrom-Json
 $funcKey = $keys.functionKeys.default
 

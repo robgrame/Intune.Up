@@ -37,21 +37,22 @@ $minor = [int]$Matches[2]
 $patch = [int]$Matches[3]
 
 # Get the latest commit message
-$commitMsg = git log -1 --pretty=%B 2>$null
-if (-not $commitMsg) {
+$commitMsg = git log -1 --pretty=%B
+if ($LASTEXITCODE -ne 0 -or -not $commitMsg) {
     Write-Host "❌ No git commits found" -ForegroundColor Red
     exit 1
 }
 
+$fullMsg = $commitMsg -join "`n"
 $firstLine = ($commitMsg -split "`n")[0].Trim()
 
 Write-Host "Current version: $currentVersion" -ForegroundColor Cyan
 Write-Host "Last commit: $firstLine" -ForegroundColor Gray
 
-# Determine bump type
+# Determine bump type based on Conventional Commits
 $bumpType = 'patch'
 
-if ($firstLine -match 'BREAKING CHANGE' -or $firstLine -match '^[a-z]+!:') {
+if ($fullMsg -match 'BREAKING CHANGE' -or $firstLine -match '^[a-z]+!:') {
     $bumpType = 'major'
 } elseif ($firstLine -match '^feat(\(.+\))?:') {
     $bumpType = 'minor'
@@ -86,5 +87,6 @@ git commit -m "chore: bump version to $newVersion" --no-verify
 git tag -a "v$newVersion" -m "Release v$newVersion"
 
 Write-Host "✅ Created tag v$newVersion" -ForegroundColor Green
+$currentBranch = git rev-parse --abbrev-ref HEAD
 Write-Host ""
-Write-Host "To push: git push origin master --tags" -ForegroundColor Cyan
+Write-Host "To push: git push origin $currentBranch --tags" -ForegroundColor Cyan

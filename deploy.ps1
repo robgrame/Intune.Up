@@ -1,20 +1,23 @@
 <#
 .SYNOPSIS
     Intune.Up - Full deployment script
-    Executes: Build -> Publish -> Bicep infra -> Zip deploy function apps
+    Executes: Build -> Publish -> Bicep infra -> Zip deploy function apps -> Runbook
 
 .PARAMETER Environment
     Target environment: dev, test, prod (default: dev)
 
 .PARAMETER Location
     Azure region for deployment (default: westeurope)
-    Note: Use westeurope for this subscription (VM quota in eastus is limited)
 
 .PARAMETER ResourceGroup
-    Azure Resource Group (default: rg-intuneup-<Environment>)
+    Azure Resource Group (default: rg-{BaseName}-{Environment})
 
 .PARAMETER BaseName
     Base name for resource naming (default: intuneup)
+
+.PARAMETER SubscriptionId
+    Azure Subscription ID. If provided, all az commands use this subscription.
+    Prevents accidental deployment to wrong subscription.
 
 .PARAMETER AllowedIssuerThumbprints
     Comma-separated CA thumbprints for mTLS validation.
@@ -29,11 +32,14 @@
 .PARAMETER SkipFunctionDeploy
     Skip zip deploy of function apps
 
+.PARAMETER SkipRunbook
+    Skip automation runbook deployment
+
 .EXAMPLE
-    .\deploy.ps1 -Environment dev -AllowedIssuerThumbprints 'ABC123...'
-    .\deploy.ps1 -Environment dev -SkipBuild
-    .\deploy.ps1 -Environment prod -Location westeurope
-    .\deploy.ps1 -Environment dev -SkipBicep -SkipBuild
+    .\deploy.ps1 -BaseName iu001 -Environment test
+    .\deploy.ps1 -BaseName iu001 -Environment test -SubscriptionId 'b45c5b53-...'
+    .\deploy.ps1 -BaseName iu001 -Environment test -SkipBuild -SkipBicep
+    .\deploy.ps1 -BaseName iu001 -Environment test -SkipBuild -SkipBicep -SkipFunctionDeploy
 #>
 [CmdletBinding()]
 param(
@@ -45,6 +51,8 @@ param(
     [string]$ResourceGroup = '',
 
     [string]$BaseName = 'intuneup',
+
+    [string]$SubscriptionId = '',
 
     [string]$AllowedIssuerThumbprints = '',
 
@@ -62,12 +70,16 @@ function Write-Ok   { param([string]$m) Write-Host "   OK  $m" -ForegroundColor 
 function Write-Warn { param([string]$m) Write-Host "   WARN $m" -ForegroundColor Yellow }
 function Write-Fail { param([string]$m) Write-Host "   FAIL $m" -ForegroundColor Red; exit 1 }
 
-# Derived paths and names — force lowercase for Azure resource naming consistency
+# Force lowercase for Azure resource naming consistency
 $BaseName    = $BaseName.ToLower()
 $Environment = $Environment.ToLower()
 $Location    = $Location.ToLower()
 if (-not $ResourceGroup) { $ResourceGroup = "rg-$BaseName-$Environment" }
 $ResourceGroup = $ResourceGroup.ToLower()
+
+# Build --subscription flag for all az commands
+$subParam = @()
+if ($SubscriptionId) { $subParam = @('--subscription', $SubscriptionId) }
 
 $RepoRoot    = $PSScriptRoot
 $SrcDir      = Join-Path $RepoRoot 'src'
@@ -82,6 +94,7 @@ $SbZip       = Join-Path $PublishDir 'sb.zip'
 $MainBicep   = Join-Path $BicepDir 'main.bicep'
 $FuncHttp    = "func-$BaseName-http-$Environment"
 $FuncSb      = "func-$BaseName-sb-$Environment"
+$AAName      = "aa-$BaseName-$Environment"
 
 Write-Host ''
 Write-Host '=============================================' -ForegroundColor DarkCyan
@@ -91,6 +104,7 @@ Write-Host "  Environment   : $Environment"
 Write-Host "  Location      : $Location"
 Write-Host "  ResourceGroup : $ResourceGroup"
 Write-Host "  BaseName      : $BaseName"
+Write-Host "  Subscription  : $(if ($SubscriptionId) { $SubscriptionId } else { '(current default)' })"
 Write-Host "  HTTP Function : $FuncHttp"
 Write-Host "  SB Function   : $FuncSb"
 Write-Host "  SkipBuild     : $SkipBuild"
@@ -108,7 +122,13 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
     Write-Fail 'Azure CLI not found. Install from https://aka.ms/installazurecliwindows'
 }
 
-$accountJson = az account show -o json 2>$null
+# Set and verify subscription
+if ($SubscriptionId) {
+    az account set --subscription $SubscriptionId
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to set subscription: $SubscriptionId" }
+}
+
+$accountJson = az account show -o json
 if (-not $accountJson) { Write-Fail 'Not logged in to Azure. Run: az login' }
 $account = $accountJson | ConvertFrom-Json
 Write-Ok "Azure: $($account.name) ($($account.id))"
@@ -124,10 +144,11 @@ if (-not $SkipBuild) {
     }
 }
 
-$rgExists = az group exists --name $ResourceGroup
+$rgExists = az group exists --name $ResourceGroup @subParam
 if ($rgExists -ne 'true') { 
     Write-Step "Creating resource group: $ResourceGroup in $Location"
-    az group create --name $ResourceGroup --location $Location --output none
+    az group create --name $ResourceGroup --location $Location @subParam --output none
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to create resource group: $ResourceGroup" }
     Write-Ok "Resource group created: $ResourceGroup"
 } else {
     Write-Ok "Resource group already exists: $ResourceGroup"
@@ -199,19 +220,21 @@ if (-not $SkipBicep) {
                          baseName=$BaseName `
                          location=$Location `
                          allowedIssuerThumbprints=$AllowedIssuerThumbprints `
+        @subParam `
         --output table
 
     if ($LASTEXITCODE -ne 0) { Write-Fail 'Bicep deployment failed.' }
     Write-Ok 'Infrastructure deployed'
 
     Write-Step 'Assigning deployer RBAC (Table Data Contributor on password-expiry storage)'
-    $deployerObjectId = az ad signed-in-user show --query "id" -o tsv 2>$null
-    $peStorageId = az storage account show -g $ResourceGroup -n "st${BaseName}pe${Environment}" --query "id" -o tsv 2>$null
+    $deployerObjectId = az ad signed-in-user show --query "id" -o tsv
+    $peStorageName = "st${BaseName}pe${Environment}"
+    $peStorageId = az storage account show -g $ResourceGroup -n $peStorageName @subParam --query "id" -o tsv
     if ($deployerObjectId -and $peStorageId) {
-        az role assignment create --assignee $deployerObjectId --role "Storage Table Data Contributor" --scope $peStorageId -o none 2>$null
-        Write-Ok "Deployer RBAC assigned on password-expiry storage"
+        az role assignment create --assignee $deployerObjectId --role "Storage Table Data Contributor" --scope $peStorageId -o none
+        Write-Ok "Deployer RBAC assigned on $peStorageName"
     } else {
-        Write-Warn "Could not assign deployer RBAC (non-blocking)"
+        Write-Warn "Could not assign deployer RBAC (deployer OID: $deployerObjectId, storage: $peStorageId)"
     }
 
     Write-Step 'Waiting for RBAC propagation (90 seconds)'
@@ -232,7 +255,7 @@ function Deploy-FunctionZip {
     for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
         Write-Host "  Attempt $attempt of $MaxRetries..." -ForegroundColor Gray
         az functionapp deployment source config-zip `
-            --resource-group $RG --name $AppName --src $ZipPath --timeout 180 2>&1
+            --resource-group $RG --name $AppName --src $ZipPath --timeout 180 @subParam 2>&1
         if ($LASTEXITCODE -eq 0) { return $true }
         
         if ($attempt -lt $MaxRetries) {
@@ -268,27 +291,33 @@ if (-not $SkipFunctionDeploy) {
 if (-not $SkipRunbook) {
 
     $runbookScript = Join-Path $RepoRoot 'service-desk\runbooks\server-side\Write-PasswordExpiryTriggers.ps1'
-    $aaName = "aa-$BaseName-$Environment"
 
     if (Test-Path $runbookScript) {
         Write-Step "Deploying Automation Runbook: Write-PasswordExpiryTriggers"
 
         az automation runbook replace-content `
             --resource-group $ResourceGroup `
-            --automation-account-name $aaName `
+            --automation-account-name $AAName `
             --name 'Write-PasswordExpiryTriggers' `
             --content "@$runbookScript" `
-            -o none 2>$null
+            @subParam `
+            -o none
 
-        if ($LASTEXITCODE -eq 0) {
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Runbook content upload failed"
+        } else {
             az automation runbook publish `
                 --resource-group $ResourceGroup `
-                --automation-account-name $aaName `
+                --automation-account-name $AAName `
                 --name 'Write-PasswordExpiryTriggers' `
-                -o none 2>$null
-            Write-Ok "Runbook published"
-        } else {
-            Write-Warn "Runbook content upload failed (non-blocking)"
+                @subParam `
+                -o none
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "Runbook publish failed"
+            } else {
+                Write-Ok "Runbook published"
+            }
         }
     } else {
         Write-Warn "Runbook script not found at $runbookScript"
@@ -306,7 +335,11 @@ Write-Host '=============================================' -ForegroundColor Gree
 Write-Host '   Deploy completed successfully!           ' -ForegroundColor Green
 Write-Host '=============================================' -ForegroundColor Green
 Write-Host ''
-Write-Host "  HTTP : https://$FuncHttp.azurewebsites.net/api/collect"
-Write-Host "  SB   : $FuncSb"
-Write-Host "  KV   : kv-$BaseName-$Environment"
+Write-Host "  HTTP     : https://$FuncHttp.azurewebsites.net/api/collect"
+Write-Host "  SB       : $FuncSb"
+Write-Host "  KV       : kv-$BaseName-$Environment"
+Write-Host "  Runbook  : $AAName / Write-PasswordExpiryTriggers"
+Write-Host "  Version  : $(Get-Content (Join-Path $RepoRoot 'VERSION') -ErrorAction SilentlyContinue)"
+Write-Host ''
+Write-Host "  Test E2E : .\test-e2e-full.ps1 -BaseName $BaseName -Environment $Environment$(if ($SubscriptionId) { " -SubscriptionId $SubscriptionId" })"
 Write-Host ''

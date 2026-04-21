@@ -22,6 +22,7 @@
 
 param(
     [int]$ThresholdDays = 10,
+    [int]$MaxPasswordAgeDays = 90,
     [string]$StorageAccountName,
     [string]$TableName = "PasswordExpiry"
 )
@@ -53,8 +54,10 @@ try {
         -Body (@{ TableName = $TableName } | ConvertTo-Json) -ErrorAction Stop | Out-Null
     Write-Output "Table '$TableName' created"
 } catch {
-    if ($_.Exception.Message -notmatch "TableAlreadyExists") {
+    if ($_.Exception.Message -match "TableAlreadyExists") {
         Write-Output "Table '$TableName' already exists"
+    } else {
+        throw "Failed to create table '$TableName': $_"
     }
 }
 
@@ -84,9 +87,7 @@ $users = Get-MgUser -All `
     -Filter "accountEnabled eq true" |
     Where-Object {
         if (-not $_.LastPasswordChangeDateTime) { return $false }
-        # Calcola scadenza assumendo policy di 90 giorni (adattare al vostro ambiente)
-        $passwordMaxAgeDays = 90  # TODO: leggere dalla policy reale
-        $expiryDate = $_.LastPasswordChangeDateTime.AddDays($passwordMaxAgeDays)
+        $expiryDate = $_.LastPasswordChangeDateTime.AddDays($MaxPasswordAgeDays)
         return $expiryDate -le $targetDate -and $expiryDate -gt $today
     }
 
@@ -94,8 +95,7 @@ Write-Output "Found $($users.Count) users with expiring passwords"
 
 $written = 0
 foreach ($user in $users) {
-    $passwordMaxAgeDays = 90  # TODO: leggere dalla policy reale
-    $expiryDate = $user.LastPasswordChangeDateTime.AddDays($passwordMaxAgeDays)
+    $expiryDate = $user.LastPasswordChangeDateTime.AddDays($MaxPasswordAgeDays)
     $daysUntilExpiry = [math]::Round(($expiryDate - $today).TotalDays, 0)
 
     $entity = @{
