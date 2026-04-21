@@ -212,24 +212,38 @@ if (-not $SkipBicep) {
 }
 
 # --------------------------------------------------------------------------
-# Step 3: Zip deploy function apps
+# Step 3: Zip deploy function apps (with retry for transient 5xx errors)
 # --------------------------------------------------------------------------
+function Deploy-FunctionZip {
+    param([string]$RG, [string]$AppName, [string]$ZipPath, [int]$MaxRetries = 3)
+    
+    for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
+        Write-Host "  Attempt $attempt of $MaxRetries..." -ForegroundColor Gray
+        az functionapp deployment source config-zip `
+            --resource-group $RG --name $AppName --src $ZipPath --timeout 180 2>&1
+        if ($LASTEXITCODE -eq 0) { return $true }
+        
+        if ($attempt -lt $MaxRetries) {
+            $wait = $attempt * 20
+            Write-Warn "Deploy failed (attempt $attempt). Retrying in ${wait}s..."
+            Start-Sleep -Seconds $wait
+        }
+    }
+    return $false
+}
+
 if (-not $SkipFunctionDeploy) {
 
     Write-Step "Deploying HTTP function: $FuncHttp"
-    az functionapp deployment source config-zip `
-        --resource-group $ResourceGroup `
-        --name $FuncHttp `
-        --src  $HttpZip
-    if ($LASTEXITCODE -ne 0) { Write-Fail "HTTP function deploy failed." }
+    if (-not (Deploy-FunctionZip -RG $ResourceGroup -AppName $FuncHttp -ZipPath $HttpZip)) {
+        Write-Fail "HTTP function deploy failed after retries."
+    }
     Write-Ok "$FuncHttp deployed"
 
     Write-Step "Deploying ServiceBus function: $FuncSb"
-    az functionapp deployment source config-zip `
-        --resource-group $ResourceGroup `
-        --name $FuncSb `
-        --src  $SbZip
-    if ($LASTEXITCODE -ne 0) { Write-Fail "SB function deploy failed." }
+    if (-not (Deploy-FunctionZip -RG $ResourceGroup -AppName $FuncSb -ZipPath $SbZip)) {
+        Write-Fail "SB function deploy failed after retries."
+    }
     Write-Ok "$FuncSb deployed"
 
 } else {
