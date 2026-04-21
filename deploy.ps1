@@ -318,6 +318,51 @@ if (-not $SkipRunbook) {
                 Write-Warn "Runbook publish failed"
             } else {
                 Write-Ok "Runbook published"
+
+                # Create daily schedule and link to runbook with parameters
+                $scheduleName = "Daily-PasswordExpiry"
+                $peStorageName = "st${BaseName}pe${Environment}"
+                $scheduleStart = (Get-Date).AddDays(1).ToString("yyyy-MM-ddT06:00:00+00:00")
+
+                Write-Step "Creating daily schedule and linking to runbook"
+
+                # Create schedule (ignore if already exists)
+                az automation schedule create `
+                    --resource-group $ResourceGroup `
+                    --automation-account-name $AAName `
+                    --name $scheduleName `
+                    --frequency Day --interval 1 `
+                    --start-time $scheduleStart `
+                    --time-zone "W. Europe Standard Time" `
+                    @subParam `
+                    -o none 2>&1 | Out-Null
+
+                # Link schedule to runbook with parameters via REST API
+                $aaId = az automation account show -g $ResourceGroup -n $AAName @subParam --query "id" -o tsv
+                $jobScheduleId = [guid]::NewGuid().ToString()
+                $linkBody = @{
+                    properties = @{
+                        schedule = @{ name = $scheduleName }
+                        runbook  = @{ name = "Write-PasswordExpiryTriggers" }
+                        parameters = @{
+                            StorageAccountName = $peStorageName
+                            MaxPasswordAgeDays = "90"
+                            ThresholdDays      = "10"
+                        }
+                    }
+                } | ConvertTo-Json -Depth 4
+
+                az rest --method PUT `
+                    --uri "$aaId/jobSchedules/$($jobScheduleId)?api-version=2023-11-01" `
+                    --body $linkBody `
+                    -o none 2>&1 | Out-Null
+
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Ok "Schedule '$scheduleName' linked to runbook with parameters"
+                    Write-Host "    StorageAccountName=$peStorageName MaxPasswordAgeDays=90 ThresholdDays=10" -ForegroundColor Gray
+                } else {
+                    Write-Warn "Schedule link failed — configure manually in Azure Portal"
+                }
             }
         }
     } else {
