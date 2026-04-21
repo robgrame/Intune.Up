@@ -41,15 +41,26 @@ Write-Host "📦 Test payload:" -ForegroundColor Cyan
 Write-Host $testData -ForegroundColor DarkGray
 Write-Host ""
 
-# Get function keys for authentication
+# Get function keys for authentication via REST API
 Write-Host "Getting function key for authentication..." -ForegroundColor Yellow
 try {
-    $keys = az functionapp keys list -g $ResourceGroup -n "func-iu94341-http-prod" -o json 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
-    $functionKey = $keys.functionKeys.default
+    # Extract function app name from URL
+    $funcAppName = ([Uri]$HttpFunctionUrl).Host -replace '\.azurewebsites\.net$',''
+    $funcId = az functionapp show -g $ResourceGroup -n $funcAppName --query "id" -o tsv 2>$null
+    
+    if ($funcId) {
+        $keysJson = az rest --method post --uri "$funcId/host/default/listkeys?api-version=2022-03-01" -o json 2>$null
+        if ($keysJson) {
+            $keys = $keysJson | ConvertFrom-Json
+            $functionKey = $keys.functionKeys.default
+        }
+    }
     
     if ($functionKey) {
         $HttpFunctionUrl = "$HttpFunctionUrl`?code=$functionKey"
         Write-Host "✅ Function key obtained" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️  Could not get function key — trying without auth" -ForegroundColor Yellow
     }
 } catch {
     Write-Host "⚠️  Could not get function key: $_" -ForegroundColor Yellow
@@ -125,10 +136,11 @@ try {
     } else {
         Write-Host "Workspace ID: $workspaceInfo" -ForegroundColor Gray
         
-        # Query for test data
+        # Query for test data — table name is IntuneUp_{UseCase}_CL
         $kqlQuery = @"
-IntuneUp_DeviceInfo_CL 
-| where testFlag_s == "E2E-TEST"
+search * 
+| where TimeGenerated > ago(10m)
+| where Type contains "IntuneUp"
 | order by TimeGenerated desc
 | take 5
 "@
@@ -142,20 +154,15 @@ IntuneUp_DeviceInfo_CL
             --analytics-query $kqlQuery `
             -o json 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
         
-        if ($results) {
+        if ($results -and $results.Count -gt 0) {
             Write-Host "✅ FOUND TEST DATA IN LOG ANALYTICS!" -ForegroundColor Green
-            Write-Host ""
-            Write-Host "Results:" -ForegroundColor Cyan
-            $results | ForEach-Object {
-                Write-Host "   Device ID: $($_.deviceId_s)" -ForegroundColor Yellow
-                Write-Host "   Hostname: $($_.hostname_s)" -ForegroundColor Yellow
-                Write-Host "   Timestamp: $($_.timestamp_s)" -ForegroundColor Yellow
-                Write-Host "   Time Generated: $($_.TimeGenerated)" -ForegroundColor Yellow
-                Write-Host ""
+            Write-Host "   $($results.Count) record(s) found" -ForegroundColor Yellow
+            $results | Select-Object -First 3 | ForEach-Object {
+                Write-Host "   Type: $($_.Type)  DeviceId: $($_.DeviceId_s)  TimeGenerated: $($_.TimeGenerated)" -ForegroundColor Yellow
             }
         } else {
             Write-Host "⏳ No data found in Log Analytics yet" -ForegroundColor Yellow
-            Write-Host "   (It can take 1-2 minutes for data to appear)" -ForegroundColor Gray
+            Write-Host "   (Custom tables can take 5-10 minutes to appear on first ingest)" -ForegroundColor Gray
         }
     }
 } catch {
