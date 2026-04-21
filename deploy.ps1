@@ -50,7 +50,8 @@ param(
 
     [switch]$SkipBuild,
     [switch]$SkipBicep,
-    [switch]$SkipFunctionDeploy
+    [switch]$SkipFunctionDeploy,
+    [switch]$SkipRunbook
 )
 
 Set-StrictMode -Version Latest
@@ -95,6 +96,7 @@ Write-Host "  SB Function   : $FuncSb"
 Write-Host "  SkipBuild     : $SkipBuild"
 Write-Host "  SkipBicep     : $SkipBicep"
 Write-Host "  SkipFuncDeploy: $SkipFunctionDeploy"
+Write-Host "  SkipRunbook   : $SkipRunbook"
 Write-Host ''
 
 # --------------------------------------------------------------------------
@@ -263,31 +265,37 @@ if (-not $SkipFunctionDeploy) {
 # --------------------------------------------------------------------------
 # Step 4: Deploy Automation Runbook content
 # --------------------------------------------------------------------------
-$runbookScript = Join-Path $RepoRoot 'service-desk\runbooks\server-side\Write-PasswordExpiryTriggers.ps1'
-$aaName = "aa-$BaseName-$Environment"
+if (-not $SkipRunbook) {
 
-if (Test-Path $runbookScript) {
-    Write-Step "Deploying Automation Runbook: Write-PasswordExpiryTriggers"
+    $runbookScript = Join-Path $RepoRoot 'service-desk\runbooks\server-side\Write-PasswordExpiryTriggers.ps1'
+    $aaName = "aa-$BaseName-$Environment"
 
-    az automation runbook replace-content `
-        --resource-group $ResourceGroup `
-        --automation-account-name $aaName `
-        --name 'Write-PasswordExpiryTriggers' `
-        --content "@$runbookScript" `
-        -o none 2>$null
+    if (Test-Path $runbookScript) {
+        Write-Step "Deploying Automation Runbook: Write-PasswordExpiryTriggers"
 
-    if ($LASTEXITCODE -eq 0) {
-        az automation runbook publish `
+        az automation runbook replace-content `
             --resource-group $ResourceGroup `
             --automation-account-name $aaName `
             --name 'Write-PasswordExpiryTriggers' `
+            --content "@$runbookScript" `
             -o none 2>$null
-        Write-Ok "Runbook published"
+
+        if ($LASTEXITCODE -eq 0) {
+            az automation runbook publish `
+                --resource-group $ResourceGroup `
+                --automation-account-name $aaName `
+                --name 'Write-PasswordExpiryTriggers' `
+                -o none 2>$null
+            Write-Ok "Runbook published"
+        } else {
+            Write-Warn "Runbook content upload failed (non-blocking)"
+        }
     } else {
-        Write-Warn "Runbook content upload failed (non-blocking)"
+        Write-Warn "Runbook script not found at $runbookScript"
     }
+
 } else {
-    Write-Warn "Runbook script not found at $runbookScript"
+    Write-Warn 'SkipRunbook: runbook deployment skipped'
 }
 
 # --------------------------------------------------------------------------
