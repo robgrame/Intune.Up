@@ -156,6 +156,10 @@ module functionHttp 'function-app.bicep' = {
         value: serviceBus.outputs.queueName
       }
       {
+        name: 'IntuneUp__PasswordExpiry__StorageAccountName'
+        value: 'st${baseName}pe${environment}'
+      }
+      {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
         value: appInsights.outputs.connectionString
       }
@@ -219,6 +223,7 @@ module rbac 'rbac-assignments.bicep' = {
     sbFunctionPrincipalId: functionSb.outputs.principalId
     automationAccountPrincipalId: automationAccount.outputs.principalId
     httpStorageAccountName: 'st${baseName}http${environment}'
+    passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
   }
 }
 

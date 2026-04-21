@@ -124,16 +124,30 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 // ---- Storage Table Data Contributor (Automation Account writes password expiry data) ----
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 
-resource httpStorage 'Microsoft.Storage/storageAccounts@2023-01-01' existing = if (!empty(httpStorageAccountName)) {
-  name: httpStorageAccountName
+param passwordExpiryStorageAccountName string = ''
+
+resource pwdExpiryStorage 'Microsoft.Storage/storageAccounts@2023-01-01' existing = if (!empty(passwordExpiryStorageAccountName)) {
+  name: passwordExpiryStorageAccountName
 }
 
-resource tableContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(automationAccountPrincipalId) && !empty(httpStorageAccountName)) {
-  name: guid(httpStorage.id, automationAccountPrincipalId, storageTableDataContributorRoleId)
-  scope: httpStorage
+// Automation Account → Table Storage (writes expiry records)
+resource tableContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(automationAccountPrincipalId) && !empty(passwordExpiryStorageAccountName)) {
+  name: guid(pwdExpiryStorage.id, automationAccountPrincipalId, storageTableDataContributorRoleId)
+  scope: pwdExpiryStorage
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
     principalId: automationAccountPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// HTTP Function → Table Storage (reads/deletes expiry records for password-expiry and webhook endpoints)
+resource httpFuncTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(passwordExpiryStorageAccountName)) {
+  name: guid(pwdExpiryStorage.id, httpFunctionPrincipalId, storageTableDataContributorRoleId)
+  scope: pwdExpiryStorage
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: httpFunctionPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
