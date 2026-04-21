@@ -105,7 +105,8 @@ Write-Host "  Environment   : $Environment"
 Write-Host "  Location      : $Location"
 Write-Host "  ResourceGroup : $ResourceGroup"
 Write-Host "  BaseName      : $BaseName"
-Write-Host "  Subscription  : $(if ($SubscriptionId) { $SubscriptionId } else { '(current default)' })"
+$subDisplay = if ($SubscriptionId) { $SubscriptionId } else { '(current default)' }
+Write-Host "  Subscription  : $subDisplay"
 Write-Host "  HTTP Function : $FuncHttp"
 Write-Host "  SB Function   : $FuncSb"
 Write-Host "  SkipBuild     : $SkipBuild"
@@ -385,7 +386,10 @@ Write-Host "  HTTP     : https://$FuncHttp.azurewebsites.net/api/collect"
 Write-Host "  SB       : $FuncSb"
 Write-Host "  KV       : kv-$BaseName-$Environment"
 Write-Host "  Runbook  : $AAName / Write-PasswordExpiryTriggers"
-Write-Host "  Version  : $(Get-Content (Join-Path $RepoRoot 'VERSION') -ErrorAction SilentlyContinue)"
+$versionText = (Get-Content (Join-Path $RepoRoot 'VERSION') -ErrorAction SilentlyContinue)
+Write-Host "  Version  : $versionText"
 Write-Host ''
-Write-Host "  Test E2E : .\test-e2e-full.ps1 -BaseName $BaseName -Environment $Environment$(if ($SubscriptionId) { " -SubscriptionId $SubscriptionId" })"
+$testCmd = ".\test-e2e-full.ps1 -BaseName $BaseName -Environment $Environment"
+if ($SubscriptionId) { $testCmd += " -SubscriptionId $SubscriptionId" }
+Write-Host "  Test E2E : $testCmd"
 Write-Host ''

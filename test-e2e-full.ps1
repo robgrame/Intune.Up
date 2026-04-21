@@ -223,15 +223,23 @@ try {
 
 # ========== SUMMARY ==========
 Write-Host ""
-Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
-Write-Host "║             TEST RESULTS                           ║" -ForegroundColor $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
-Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor $(if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"})
+$summaryColor = if ($testResults.Step1 -and $testResults.Step3) {"Green"} else {"Red"}
+Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor $summaryColor
+Write-Host "║             TEST RESULTS                           ║" -ForegroundColor $summaryColor
+Write-Host "╚════════════════════════════════════════════════════╝" -ForegroundColor $summaryColor
 Write-Host ""
-Write-Host "  $(if ($testResults.Step1) {'✅'} else {'❌'}) STEP 1: HTTP Function → 202 Accepted" -ForegroundColor $(if ($testResults.Step1) {"Green"} else {"Red"})
-Write-Host "  $(if ($testResults.Step2) {'✅'} else {'❌'}) STEP 2: Processing wait" -ForegroundColor $(if ($testResults.Step2) {"Green"} else {"Red"})
-Write-Host "  $(if ($testResults.Step3) {'✅'} else {'❌'}) STEP 3: Service Bus queue consumed" -ForegroundColor $(if ($testResults.Step3) {"Green"} else {"Red"})
-Write-Host "  $(if ($testResults.Step4) {'✅'} else {'⏳'}) STEP 4: Log Analytics data" -ForegroundColor $(if ($testResults.Step4) {"Green"} else {"Yellow"})
-Write-Host "  $(if ($testResults.Step5) {'✅'} else {'⏳'}) STEP 5: Password Expiry endpoint" -ForegroundColor $(if ($testResults.Step5) {"Green"} else {"Yellow"})
+
+$s1Icon = if ($testResults.Step1) {'  ✅'} else {'  ❌'}; $s1Color = if ($testResults.Step1) {"Green"} else {"Red"}
+$s2Icon = if ($testResults.Step2) {'  ✅'} else {'  ❌'}; $s2Color = if ($testResults.Step2) {"Green"} else {"Red"}
+$s3Icon = if ($testResults.Step3) {'  ✅'} else {'  ❌'}; $s3Color = if ($testResults.Step3) {"Green"} else {"Red"}
+$s4Icon = if ($testResults.Step4) {'  ✅'} else {'  ⏳'}; $s4Color = if ($testResults.Step4) {"Green"} else {"Yellow"}
+$s5Icon = if ($testResults.Step5) {'  ✅'} else {'  ⏳'}; $s5Color = if ($testResults.Step5) {"Green"} else {"Yellow"}
+
+Write-Host "$s1Icon STEP 1: HTTP Function - 202 Accepted" -ForegroundColor $s1Color
+Write-Host "$s2Icon STEP 2: Processing wait" -ForegroundColor $s2Color
+Write-Host "$s3Icon STEP 3: Service Bus queue consumed" -ForegroundColor $s3Color
+Write-Host "$s4Icon STEP 4: Log Analytics data" -ForegroundColor $s4Color
+Write-Host "$s5Icon STEP 5: Password Expiry endpoint" -ForegroundColor $s5Color
 Write-Host ""
 Write-Host "  DeviceId: $deviceId" -ForegroundColor Cyan
 Write-Host "  KQL:      IntuneUp_E2ETest_CL | where DeviceId_s == '$deviceId'" -ForegroundColor Cyan
