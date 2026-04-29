@@ -17,6 +17,9 @@ param dceEndpoint string
 @description('Default DCR Immutable ID – used when no per-use-case DCR is configured')
 param dcrImmutableId string
 
+@description('Per-use-case DCR immutable IDs to seed in App Configuration')
+param dcrUseCases array = []
+
 @secure()
 param allowedIssuerThumbprints string = ''
 
@@ -65,6 +68,12 @@ resource cfgDcrImmutableId 'Microsoft.AppConfiguration/configurationStores/keyVa
   name: 'IntuneUp:LogAnalytics:DcrImmutableId'
   properties: { value: dcrImmutableId }
 }
+
+resource cfgDcrUseCases 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = [for dcr in dcrUseCases: {
+  parent: appConfig
+  name: 'IntuneUp:LogAnalytics:Dcr:${dcr.useCase}:ImmutableId'
+  properties: { value: dcr.immutableId }
+}]
 
 resource cfgClaimCheckContainer 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig

@@ -124,21 +124,21 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 // Required for the Logs Ingestion API (DCE + DCR), replacing the deprecated HTTP Data Collector API.
 var dcrDataSenderRoleId = 'b01b39f6-e7c2-44a3-96c6-5b8c6b11da91'
 
-param dcrResourceId string = ''
+param dcrResourceIds array = []
 
-resource dcrExisting 'Microsoft.Insights/dataCollectionRules@2023-03-11' existing = if (!empty(dcrResourceId)) {
-  name: last(split(dcrResourceId, '/'))
-}
+resource dcrExisting 'Microsoft.Insights/dataCollectionRules@2023-03-11' existing = [for id in dcrResourceIds: {
+  name: last(split(id, '/'))
+}]
 
-resource dcrDataSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(dcrResourceId)) {
-  name: guid(dcrResourceId, sbFunctionPrincipalId, dcrDataSenderRoleId)
-  scope: dcrExisting
+resource dcrDataSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (id, i) in dcrResourceIds: {
+  name: guid(id, sbFunctionPrincipalId, dcrDataSenderRoleId)
+  scope: dcrExisting[i]
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', dcrDataSenderRoleId)
     principalId: sbFunctionPrincipalId
     principalType: 'ServicePrincipal'
   }
-}
+}]
 
 // ---- Storage Table Data Contributor (Automation Account writes password expiry data) ----
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'

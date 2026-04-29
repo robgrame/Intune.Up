@@ -32,13 +32,24 @@ function Send-LogsIngestionData {
     )
 
     # Acquire Managed Identity token for Azure Monitor ingestion scope
+    # Use IDENTITY_ENDPOINT / IDENTITY_HEADER (App Service / Functions runtime),
+    # fall back to IMDS for VM scenarios.
     try {
-        $tokenResponse = Invoke-RestMethod `
-            -Uri "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmonitor.azure.com%2F" `
-            -Headers @{ Metadata = "true" } `
-            -Method Get
+        $identityEndpoint = $env:IDENTITY_ENDPOINT
+        $identityHeader   = $env:IDENTITY_HEADER
+        if (-not [string]::IsNullOrEmpty($identityEndpoint) -and -not [string]::IsNullOrEmpty($identityHeader)) {
+            $tokenResponse = Invoke-RestMethod `
+                -Uri "${identityEndpoint}?api-version=2019-08-01&resource=https%3A%2F%2Fmonitor.azure.com%2F" `
+                -Headers @{ 'X-IDENTITY-HEADER' = $identityHeader } `
+                -Method Get
+        } else {
+            $tokenResponse = Invoke-RestMethod `
+                -Uri "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmonitor.azure.com%2F" `
+                -Headers @{ Metadata = "true" } `
+                -Method Get
+        }
         if ([string]::IsNullOrEmpty($tokenResponse.access_token)) {
-            throw "access_token is empty in IMDS response"
+            throw "access_token is empty in token response"
         }
         $token = $tokenResponse.access_token
     } catch {

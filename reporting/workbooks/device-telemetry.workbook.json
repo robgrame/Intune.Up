@@ -38,7 +38,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| count",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName\n| count",
         "size": 4,
         "title": "Active Devices (reporting in range)",
         "queryType": 0,
@@ -50,7 +50,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| where UptimeHours_d > 336\n| count",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| extend dev = parse_json(Data)\n| extend UptimeHours = toreal(dev.UptimeHours)\n| summarize arg_max(TimeGenerated, *) by DeviceName\n| where UptimeHours > 336\n| count",
         "size": 4,
         "title": "Devices pending reboot (>14 days)",
         "queryType": 0,
@@ -62,7 +62,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| where UptimeHours_d > 336\n| project DeviceName_s, UPN_s,\n          UptimeDays = round(UptimeHours_d / 24, 1),\n          LastBootTime_s\n| sort by UptimeDays desc",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| extend dev = parse_json(Data)\n| extend UptimeHours = toreal(dev.UptimeHours)\n| summarize arg_max(TimeGenerated, *) by DeviceName\n| where UptimeHours > 336\n| project DeviceName, UPN,\n          UptimeDays = round(UptimeHours / 24, 1),\n          LastBootTime = tostring(parse_json(Data).LastBootTime)\n| sort by UptimeDays desc",
         "size": 0,
         "title": "Devices pending reboot – detail",
         "queryType": 0,
@@ -79,7 +79,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| extend JoinType = case(\n    AzureAdJoined_b == true and DomainJoined_b == true, \"Hybrid\",\n    AzureAdJoined_b == true, \"Azure AD Only\",\n    DomainJoined_b  == true, \"Domain Only\",\n    \"Workgroup\")\n| summarize Count = count() by JoinType",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| extend dev = parse_json(Data)\n| summarize arg_max(TimeGenerated, *) by DeviceName\n| extend JoinType = case(\n    tobool(parse_json(Data).AzureAdJoined) == true and tobool(parse_json(Data).DomainJoined) == true, \"Hybrid\",\n    tobool(parse_json(Data).AzureAdJoined) == true, \"Azure AD Only\",\n    tobool(parse_json(Data).DomainJoined)  == true, \"Domain Only\",\n    \"Workgroup\")\n| summarize Count = count() by JoinType",
         "size": 3,
         "title": "Device join type distribution",
         "queryType": 0,
@@ -91,7 +91,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| summarize arg_max(TimeGenerated, *) by DeviceName_s\n| project DeviceName_s, UPN_s,\n          LastLoggedOnUser_s, LastLoggedOnDisplayName_s,\n          AzureAdJoined_b, DomainJoined_b,\n          UptimeHours_d, TimeGenerated\n| sort by TimeGenerated desc",
+        "query": "IntuneUp_LoginInformation_CL\n| where TimeGenerated {TimeRange}\n| extend dev = parse_json(Data)\n| summarize arg_max(TimeGenerated, *) by DeviceName\n| project DeviceName, UPN,\n          LastLoggedOnUser = tostring(parse_json(Data).LastLoggedOnUser),\n          LastLoggedOnDisplayName = tostring(parse_json(Data).LastLoggedOnDisplayName),\n          AzureAdJoined = tobool(parse_json(Data).AzureAdJoined),\n          DomainJoined = tobool(parse_json(Data).DomainJoined),\n          UptimeHours = toreal(parse_json(Data).UptimeHours),\n          TimeGenerated\n| sort by TimeGenerated desc",
         "size": 0,
         "title": "All devices – latest snapshot",
         "queryType": 0,

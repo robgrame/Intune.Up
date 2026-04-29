@@ -105,7 +105,7 @@ module dce 'data-collection-endpoint.bicep' = {
   }
 }
 
-// ---- Data Collection Rule – LoginInformation use case (sample) ----
+// ---- Data Collection Rules – one per use case ----
 module dcrLoginInformation 'data-collection-rule.bicep' = {
   name: 'dcr-login-information'
   params: {
@@ -115,6 +115,20 @@ module dcrLoginInformation 'data-collection-rule.bicep' = {
     workspaceResourceId: logAnalytics.outputs.workspaceResourceId
     tablePrefix: 'IntuneUp'
     useCase: 'LoginInformation'
+    retentionDays: logRetentionDays
+    tags: tags
+  }
+}
+
+module dcrPasswordExpiryTrigger 'data-collection-rule.bicep' = {
+  name: 'dcr-password-expiry-trigger'
+  params: {
+    name: 'dcr-${baseName}-PasswordExpiryTrigger-${environment}'
+    location: location
+    dceResourceId: dce.outputs.dceResourceId
+    workspaceResourceId: logAnalytics.outputs.workspaceResourceId
+    tablePrefix: 'IntuneUp'
+    useCase: 'PasswordExpiryTrigger'
     retentionDays: logRetentionDays
     tags: tags
   }
@@ -227,7 +241,10 @@ module rbac 'rbac-assignments.bicep' = {
     sbFunctionPrincipalId: sbContainerApp.outputs.principalId
     automationAccountPrincipalId: ''
     httpStorageAccountName: 'st${baseName}cc${environment}'
-    dcrResourceId: dcrLoginInformation.outputs.dcrResourceId
+    dcrResourceIds: [
+      dcrLoginInformation.outputs.dcrResourceId
+      dcrPasswordExpiryTrigger.outputs.dcrResourceId
+    ]
   }
 }
 
@@ -245,6 +262,9 @@ module configSeed 'config-seed.bicep' = {
     allowedIssuerThumbprints: allowedIssuerThumbprints
     dceEndpoint: dce.outputs.dceEndpoint
     dcrImmutableId: dcrLoginInformation.outputs.dcrImmutableId
+    dcrUseCases: [
+      { useCase: 'PasswordExpiryTrigger', immutableId: dcrPasswordExpiryTrigger.outputs.dcrImmutableId }
+    ]
   }
 }
 
@@ -261,3 +281,4 @@ output httpContainerAppPrincipalId string = httpContainerApp.outputs.principalId
 output sbContainerAppPrincipalId string = sbContainerApp.outputs.principalId
 output dceEndpoint string = dce.outputs.dceEndpoint
 output dcrLoginInformationImmutableId string = dcrLoginInformation.outputs.dcrImmutableId
+output dcrPasswordExpiryTriggerImmutableId string = dcrPasswordExpiryTrigger.outputs.dcrImmutableId

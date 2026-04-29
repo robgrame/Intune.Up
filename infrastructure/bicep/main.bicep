@@ -109,10 +109,10 @@ module dce 'data-collection-endpoint.bicep' = {
   }
 }
 
-// ---- Data Collection Rule – LoginInformation use case (sample) ----
-// Add one DCR per use case. Each DCR's immutableId is stored in App Config
-// under IntuneUp:LogAnalytics:Dcr:{UseCase}:ImmutableId.
-// The first DCR is also set as the default (IntuneUp:LogAnalytics:DcrImmutableId).
+// ---- Data Collection Rules – one per use case ----
+// Each DCR's immutableId is stored in App Config under
+// IntuneUp:LogAnalytics:Dcr:{UseCase}:ImmutableId.
+// The first DCR (LoginInformation) is also the default (IntuneUp:LogAnalytics:DcrImmutableId).
 module dcrLoginInformation 'data-collection-rule.bicep' = {
   name: 'dcr-login-information'
   params: {
@@ -122,6 +122,20 @@ module dcrLoginInformation 'data-collection-rule.bicep' = {
     workspaceResourceId: logAnalytics.outputs.workspaceResourceId
     tablePrefix: 'IntuneUp'
     useCase: 'LoginInformation'
+    retentionDays: logRetentionDays
+    tags: tags
+  }
+}
+
+module dcrPasswordExpiryTrigger 'data-collection-rule.bicep' = {
+  name: 'dcr-password-expiry-trigger'
+  params: {
+    name: 'dcr-${baseName}-PasswordExpiryTrigger-${environment}'
+    location: location
+    dceResourceId: dce.outputs.dceResourceId
+    workspaceResourceId: logAnalytics.outputs.workspaceResourceId
+    tablePrefix: 'IntuneUp'
+    useCase: 'PasswordExpiryTrigger'
     retentionDays: logRetentionDays
     tags: tags
   }
@@ -252,7 +266,10 @@ module rbac 'rbac-assignments.bicep' = {
     automationAccountPrincipalId: automationAccount.outputs.principalId
     httpStorageAccountName: 'st${baseName}http${environment}'
     passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
-    dcrResourceId: dcrLoginInformation.outputs.dcrResourceId
+    dcrResourceIds: [
+      dcrLoginInformation.outputs.dcrResourceId
+      dcrPasswordExpiryTrigger.outputs.dcrResourceId
+    ]
   }
 }
 
@@ -270,6 +287,9 @@ module configSeed 'config-seed.bicep' = {
     allowedIssuerThumbprints: allowedIssuerThumbprints
     dceEndpoint: dce.outputs.dceEndpoint
     dcrImmutableId: dcrLoginInformation.outputs.dcrImmutableId
+    dcrUseCases: [
+      { useCase: 'PasswordExpiryTrigger', immutableId: dcrPasswordExpiryTrigger.outputs.dcrImmutableId }
+    ]
   }
 }
 
@@ -284,3 +304,4 @@ output appInsightsName string = appInsights.outputs.appInsightsName
 output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey
 output dceEndpoint string = dce.outputs.dceEndpoint
 output dcrLoginInformationImmutableId string = dcrLoginInformation.outputs.dcrImmutableId
+output dcrPasswordExpiryTriggerImmutableId string = dcrPasswordExpiryTrigger.outputs.dcrImmutableId
