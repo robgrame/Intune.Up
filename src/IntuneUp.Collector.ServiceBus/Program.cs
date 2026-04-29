@@ -28,8 +28,8 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-// HttpClient for Log Analytics Data Collector API
-builder.Services.AddHttpClient("LogAnalytics");
+// (Legacy) HttpClient for Log Analytics Data Collector API
+// NOTE: ProcessorFunction now uses Logs Ingestion API (DCR/DCE) via Azure.Monitor.Ingestion.
 
 // Helper: Get config value with fallback and validation
 static string GetConfigValue(IConfiguration config, string key, string? envVarName = null, string? defaultValue = null)

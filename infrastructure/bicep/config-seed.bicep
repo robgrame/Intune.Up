@@ -8,6 +8,10 @@ param appConfigName string
 @secure()
 param logAnalyticsSharedKey string
 param logAnalyticsWorkspaceId string
+
+param logsIngestionDceUri string
+param logsIngestionDcrImmutableId string
+param logsIngestionStreamName string = 'Custom-IntuneUp'
 param serviceBusQueueName string
 param logTablePrefix string = 'IntuneUp'
 param claimCheckStorageAccountName string
@@ -54,6 +58,24 @@ resource cfgTablePrefix 'Microsoft.AppConfiguration/configurationStores/keyValue
   parent: appConfig
   name: 'IntuneUp:LogAnalytics:TablePrefix'
   properties: { value: logTablePrefix }
+}
+
+resource cfgDceUri 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:LogsIngestion:DceUri'
+  properties: { value: logsIngestionDceUri }
+}
+
+resource cfgDcrId 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:LogsIngestion:DcrImmutableId'
+  properties: { value: logsIngestionDcrImmutableId }
+}
+
+resource cfgStreamName 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:LogsIngestion:StreamName'
+  properties: { value: logsIngestionStreamName }
 }
 
 resource cfgClaimCheckContainer 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
