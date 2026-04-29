@@ -100,8 +100,10 @@ public sealed class ProcessorFunction
 
         if (result.IsError)
         {
-            _logger.LogError("Logs Ingestion API: upload failed with status {Status} for table {TableName}", result.Status, tableName);
-            throw new InvalidOperationException($"Logs Ingestion API returned error status {result.Status} for table {tableName}");
+            _logger.LogError(
+                "Logs Ingestion API: upload failed with status {Status} for table {TableName}, DCR {DcrId}, device {DeviceName}",
+                result.Status, tableName, dcrId, payload.DeviceName);
+            throw new InvalidOperationException($"Logs Ingestion API returned error status {result.Status} for table {tableName} (DCR: {dcrId})");
         }
 
         _logger.LogInformation("Written to Log Analytics table {TableName} for device {DeviceName}", tableName, payload.DeviceName);
