@@ -1,7 +1,8 @@
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
+using Azure;
+using Azure.Core;
+using Azure.Identity;
+using Azure.Monitor.Ingestion;
 using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using IntuneUp.Common.Models;
@@ -18,23 +19,25 @@ namespace IntuneUp.Collector.ServiceBus;
 public sealed class ProcessorFunction
 {
     private readonly ILogger<ProcessorFunction> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly BlobContainerClient _blobContainer;
-    private readonly string _workspaceId;
-    private readonly string _sharedKey;
+    private readonly LogsIngestionClient _logsIngestionClient;
+    private readonly string _dcrImmutableId;
+    private readonly string _streamName;
     private readonly string _tablePrefix;
 
     public ProcessorFunction(
         ILogger<ProcessorFunction> logger,
-        IHttpClientFactory httpClientFactory,
         BlobServiceClient blobServiceClient,
         IConfiguration configuration)
     {
         _logger = logger;
-        _httpClientFactory = httpClientFactory;
-        _workspaceId = configuration["IntuneUp:LogAnalytics:WorkspaceId"] ?? throw new InvalidOperationException("IntuneUp:LogAnalytics:WorkspaceId not set");
-        _sharedKey = configuration["IntuneUp:LogAnalytics:SharedKey"] ?? throw new InvalidOperationException("IntuneUp:LogAnalytics:SharedKey not set");
+        var dceUri = configuration["IntuneUp:LogsIngestion:DceUri"] ?? throw new InvalidOperationException("IntuneUp:LogsIngestion:DceUri not set");
+        _dcrImmutableId = configuration["IntuneUp:LogsIngestion:DcrImmutableId"] ?? throw new InvalidOperationException("IntuneUp:LogsIngestion:DcrImmutableId not set");
+        _streamName = configuration["IntuneUp:LogsIngestion:StreamName"] ?? "Custom-IntuneUp";
         _tablePrefix = configuration["IntuneUp:LogAnalytics:TablePrefix"] ?? "IntuneUp";
+
+        TokenCredential credential = new DefaultAzureCredential();
+        _logsIngestionClient = new LogsIngestionClient(new Uri(dceUri), credential);
         var containerName = configuration["IntuneUp:ClaimCheck:ContainerName"] ?? "claim-check";
         _blobContainer = blobServiceClient.GetBlobContainerClient(containerName);
     }
@@ -96,36 +99,28 @@ public sealed class ProcessorFunction
                 record[kvp.Key] = kvp.Value;
         }
 
-        var jsonBody = JsonSerializer.Serialize(new[] { record });
-        await SendToLogAnalyticsAsync(logType, jsonBody);
+        await UploadToLogsIngestionAsync(logType, record);
 
         _logger.LogInformation("Written to Log Analytics table {LogType} for device {DeviceName}", logType, payload.DeviceName);
     }
 
-    private async Task SendToLogAnalyticsAsync(string logType, string jsonBody)
+    private async Task UploadToLogsIngestionAsync(string logType, Dictionary<string, object?> record)
     {
-        var date = DateTime.UtcNow.ToString("r");
-        var bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
-        var contentLength = bodyBytes.Length;
+        record["LogType"] = logType;
 
-        var stringToHash = $"POST\n{contentLength}\napplication/json\nx-ms-date:{date}\n/api/logs";
-        var keyBytes = Convert.FromBase64String(_sharedKey);
-        var hashBytes = HMACSHA256.HashData(keyBytes, Encoding.UTF8.GetBytes(stringToHash));
-        var signature = Convert.ToBase64String(hashBytes);
-        var authorization = $"SharedKey {_workspaceId}:{signature}";
+        try
+        {
+            Response response = await _logsIngestionClient.UploadAsync(
+                ruleId: _dcrImmutableId,
+                streamName: _streamName,
+                logs: new[] { record });
 
-        var uri = $"https://{_workspaceId}.ods.opinsights.azure.com/api/logs?api-version=2016-04-01";
-
-        var client = _httpClientFactory.CreateClient("LogAnalytics");
-        using var request = new HttpRequestMessage(HttpMethod.Post, uri);
-        request.Content = new ByteArrayContent(bodyBytes);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        request.Headers.Add("Authorization", authorization);
-        request.Headers.Add("Log-Type", logType);
-        request.Headers.Add("x-ms-date", date);
-        request.Headers.Add("time-generated-field", "ReceivedAt");
-
-        var response = await client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+            _logger.LogDebug("Logs ingestion upload status: {Status}", response.Status);
+        }
+        catch (RequestFailedException ex)
+        {
+            _logger.LogError(ex, "Failed uploading logs via Logs Ingestion API. DCR={DcrImmutableId} Stream={StreamName}", _dcrImmutableId, _streamName);
+            throw;
+        }
     }
 }
