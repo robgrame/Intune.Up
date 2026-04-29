@@ -11,6 +11,7 @@ param httpFunctionPrincipalId string
 param sbFunctionPrincipalId string
 param automationAccountPrincipalId string = ''
 param httpStorageAccountName string = ''
+param logAnalyticsWorkspaceName string
 
 // ---- Key Vault Secrets User (both Functions) ----
 var kvSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
@@ -102,10 +103,8 @@ resource sbOwnerRoleSb 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// ---- Log Analytics Contributor (SB Function writes telemetry data) ----
+// ---- Log Analytics Contributor (SB Function – workspace-level operations) ----
 var logAnalyticsContributorRoleId = '92aaf0da-9dab-42b6-94a3-d43ce8d16293'
-
-param logAnalyticsWorkspaceName string
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
@@ -120,6 +119,26 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
     principalType: 'ServicePrincipal'
   }
 }
+
+// ---- Data Collection Rule Data Sender (SB Function writes via Logs Ingestion API) ----
+// Required for the Logs Ingestion API (DCE + DCR), replacing the deprecated HTTP Data Collector API.
+var dcrDataSenderRoleId = 'b01b39f6-e7c2-44a3-96c6-5b8c6b11da91'
+
+param dcrResourceIds array = []
+
+resource dcrExisting 'Microsoft.Insights/dataCollectionRules@2023-03-11' existing = [for id in dcrResourceIds: {
+  name: last(split(id, '/'))
+}]
+
+resource dcrDataSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (id, i) in dcrResourceIds: {
+  name: guid(id, sbFunctionPrincipalId, dcrDataSenderRoleId)
+  scope: dcrExisting[i]
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', dcrDataSenderRoleId)
+    principalId: sbFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}]
 
 // ---- Storage Table Data Contributor (Automation Account writes password expiry data) ----
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
