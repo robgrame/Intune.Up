@@ -44,8 +44,8 @@ All scripts are written in **PowerShell**, deployable via **Intune Remediations*
          │
          ▼
 ┌─────────────────────┐
-│  Log Analytics WS   │  Custom log tables
-│  KQL / Workbooks    │  IntuneUp_{UseCase}_CL
+│  Log Analytics WS   │  Custom log tables (via DCR/DCE)
+│  KQL / Workbooks    │  DCR stream → table mapping
 └─────────────────────┘
 ```
 
