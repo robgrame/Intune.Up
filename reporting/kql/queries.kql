@@ -68,7 +68,7 @@ IntuneUp_LoginInformation_CL
 IntuneUp_LoginInformation_CL
 | where TimeGenerated > ago(7d)
 | extend dev = parse_json(Data)
-| mv-expand RecentLogonEvent = parse_json(tostring(dev.RecentLogonEvents))
+| mv-expand RecentLogonEvent = dev.RecentLogonEvents
 | extend
     LogonTime   = todatetime(RecentLogonEvent.Time),
     LogonType   = toint(RecentLogonEvent.LogonType),

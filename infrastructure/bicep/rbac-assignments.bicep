@@ -126,9 +126,13 @@ var monitoringMetricsPublisherRoleId = '3913510d-42f4-4e42-8a64-420c390055eb'
 
 param dcrResourceId string = ''
 
+resource dcrExisting 'Microsoft.Insights/dataCollectionRules@2023-03-11' existing = if (!empty(dcrResourceId)) {
+  name: last(split(dcrResourceId, '/'))
+}
+
 resource dcrMetricsPublisherRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(dcrResourceId)) {
   name: guid(dcrResourceId, sbFunctionPrincipalId, monitoringMetricsPublisherRoleId)
-  scope: resourceGroup()
+  scope: dcrExisting
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringMetricsPublisherRoleId)
     principalId: sbFunctionPrincipalId

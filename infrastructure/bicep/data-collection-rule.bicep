@@ -40,12 +40,12 @@ resource customTable 'Microsoft.OperationalInsights/workspaces/tables@2022-10-01
     schema: {
       name: tableName
       columns: [
-        { name: 'TimeGenerated', type: 'dateTime' }
+        { name: 'TimeGenerated', type: 'datetime' }
         { name: 'DeviceId',      type: 'string'   }
         { name: 'DeviceName',    type: 'string'   }
         { name: 'UPN',           type: 'string'   }
         { name: 'UseCase',       type: 'string'   }
-        { name: 'ReceivedAt',    type: 'dateTime' }
+        { name: 'ReceivedAt',    type: 'datetime' }
         { name: 'FunctionRegion',type: 'string'   }
         { name: 'Data',          type: 'dynamic'  }
       ]

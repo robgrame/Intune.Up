@@ -99,7 +99,10 @@ public sealed class ProcessorFunction
         var result = await _logsIngestionClient.UploadAsync(dcrId, streamName, new[] { record });
 
         if (result.IsError)
-            _logger.LogWarning("Logs Ingestion API: upload returned status {Status} for table {TableName}", result.Status, tableName);
+        {
+            _logger.LogError("Logs Ingestion API: upload failed with status {Status} for table {TableName}", result.Status, tableName);
+            throw new InvalidOperationException($"Logs Ingestion API returned error status {result.Status} for table {tableName}");
+        }
 
         _logger.LogInformation("Written to Log Analytics table {TableName} for device {DeviceName}", tableName, payload.DeviceName);
     }
