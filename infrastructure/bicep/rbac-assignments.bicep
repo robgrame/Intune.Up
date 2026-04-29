@@ -11,6 +11,7 @@ param httpFunctionPrincipalId string
 param sbFunctionPrincipalId string
 param automationAccountPrincipalId string = ''
 param httpStorageAccountName string = ''
+param logAnalyticsWorkspaceName string
 
 // ---- Key Vault Secrets User (both Functions) ----
 var kvSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
@@ -102,10 +103,8 @@ resource sbOwnerRoleSb 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// ---- Log Analytics Contributor (SB Function writes telemetry data) ----
+// ---- Log Analytics Contributor (SB Function – workspace-level operations) ----
 var logAnalyticsContributorRoleId = '92aaf0da-9dab-42b6-94a3-d43ce8d16293'
-
-param logAnalyticsWorkspaceName string
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
@@ -116,6 +115,22 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   scope: logAnalytics
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', logAnalyticsContributorRoleId)
+    principalId: sbFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---- Monitoring Metrics Publisher on DCR (SB Function writes via Logs Ingestion API) ----
+// Required for the Logs Ingestion API (DCE + DCR), replacing the deprecated HTTP Data Collector API.
+var monitoringMetricsPublisherRoleId = '3913510d-42f4-4e42-8a64-420c390055eb'
+
+param dcrResourceId string = ''
+
+resource dcrMetricsPublisherRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(dcrResourceId)) {
+  name: guid(dcrResourceId, sbFunctionPrincipalId, monitoringMetricsPublisherRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringMetricsPublisherRoleId)
     principalId: sbFunctionPrincipalId
     principalType: 'ServicePrincipal'
   }

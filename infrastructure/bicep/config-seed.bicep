@@ -5,13 +5,17 @@
 param keyVaultName string
 param appConfigName string
 
-@secure()
-param logAnalyticsSharedKey string
 param logAnalyticsWorkspaceId string
 param serviceBusQueueName string
 param logTablePrefix string = 'IntuneUp'
 param claimCheckStorageAccountName string
 param passwordExpiryStorageAccountName string
+
+@description('Data Collection Endpoint (DCE) logs ingestion URL')
+param dceEndpoint string
+
+@description('Default DCR Immutable ID – used when no per-use-case DCR is configured')
+param dcrImmutableId string
 
 @secure()
 param allowedIssuerThumbprints string = ''
@@ -19,12 +23,6 @@ param allowedIssuerThumbprints string = ''
 // ---- Key Vault secrets ----
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
-}
-
-resource secretLaKey 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: kv
-  name: 'LogAnalyticsSharedKey'
-  properties: { value: logAnalyticsSharedKey }
 }
 
 resource secretIssuerThumbs 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
@@ -56,6 +54,18 @@ resource cfgTablePrefix 'Microsoft.AppConfiguration/configurationStores/keyValue
   properties: { value: logTablePrefix }
 }
 
+resource cfgDceEndpoint 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:LogAnalytics:DceEndpoint'
+  properties: { value: dceEndpoint }
+}
+
+resource cfgDcrImmutableId 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
+  parent: appConfig
+  name: 'IntuneUp:LogAnalytics:DcrImmutableId'
+  properties: { value: dcrImmutableId }
+}
+
 resource cfgClaimCheckContainer 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
   parent: appConfig
   name: 'IntuneUp:ClaimCheck:ContainerName'
@@ -78,16 +88,6 @@ resource cfgPwdExpiryStorage 'Microsoft.AppConfiguration/configurationStores/key
   parent: appConfig
   name: 'IntuneUp:PasswordExpiry:StorageAccountName'
   properties: { value: passwordExpiryStorageAccountName }
-}
-
-// Key Vault references in App Configuration (so Functions can read everything from App Config)
-resource cfgRefLaKey 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {
-  parent: appConfig
-  name: 'IntuneUp:LogAnalytics:SharedKey'
-  properties: {
-    value: '{"uri":"${secretLaKey.properties.secretUri}"}'
-    contentType: 'application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8'
-  }
 }
 
 resource cfgRefIssuerThumbs 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = {

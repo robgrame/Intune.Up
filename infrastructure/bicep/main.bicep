@@ -99,6 +99,34 @@ module appInsights 'app-insights.bicep' = {
   }
 }
 
+// ---- Data Collection Endpoint (Logs Ingestion API) ----
+module dce 'data-collection-endpoint.bicep' = {
+  name: 'data-collection-endpoint'
+  params: {
+    name: 'dce-${baseName}-${environment}'
+    location: location
+    tags: tags
+  }
+}
+
+// ---- Data Collection Rule – LoginInformation use case (sample) ----
+// Add one DCR per use case. Each DCR's immutableId is stored in App Config
+// under IntuneUp:LogAnalytics:Dcr:{UseCase}:ImmutableId.
+// The first DCR is also set as the default (IntuneUp:LogAnalytics:DcrImmutableId).
+module dcrLoginInformation 'data-collection-rule.bicep' = {
+  name: 'dcr-login-information'
+  params: {
+    name: 'dcr-${baseName}-LoginInformation-${environment}'
+    location: location
+    dceResourceId: dce.outputs.dceResourceId
+    workspaceResourceId: logAnalytics.outputs.workspaceResourceId
+    tablePrefix: 'IntuneUp'
+    useCase: 'LoginInformation'
+    retentionDays: logRetentionDays
+    tags: tags
+  }
+}
+
 // ---- Supporting storage accounts (for claim-check, password-expiry) ----
 // Keep names short to stay within 24-character limit
 resource stClaimCheck 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -205,7 +233,7 @@ module functionSb 'function-app.bicep' = {
   }
 }
 
-// ---- Step 3: RBAC (Function App MIs + Automation Account -> KV + App Config + Service Bus + Storage) ----
+// ---- Step 3: RBAC (Function App MIs + Automation Account -> KV + App Config + Service Bus + Storage + DCR) ----
 
 module rbac 'rbac-assignments.bicep' = {
   name: 'rbac-assignments'
@@ -224,6 +252,7 @@ module rbac 'rbac-assignments.bicep' = {
     automationAccountPrincipalId: automationAccount.outputs.principalId
     httpStorageAccountName: 'st${baseName}http${environment}'
     passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
+    dcrResourceId: dcrLoginInformation.outputs.dcrResourceId
   }
 }
 
@@ -234,12 +263,13 @@ module configSeed 'config-seed.bicep' = {
   params: {
     keyVaultName: keyVault.outputs.keyVaultName
     appConfigName: appConfig.outputs.appConfigName
-    logAnalyticsSharedKey: logAnalytics.outputs.primarySharedKey
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
     claimCheckStorageAccountName: 'st${baseName}cc${environment}'
     passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
     allowedIssuerThumbprints: allowedIssuerThumbprints
+    dceEndpoint: dce.outputs.dceEndpoint
+    dcrImmutableId: dcrLoginInformation.outputs.dcrImmutableId
   }
 }
 
@@ -252,3 +282,5 @@ output appConfigEndpoint string = appConfig.outputs.appConfigEndpoint
 output automationAccountName string = automationAccount.outputs.automationAccountName
 output appInsightsName string = appInsights.outputs.appInsightsName
 output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey
+output dceEndpoint string = dce.outputs.dceEndpoint
+output dcrLoginInformationImmutableId string = dcrLoginInformation.outputs.dcrImmutableId

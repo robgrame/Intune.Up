@@ -95,6 +95,31 @@ module appInsights 'app-insights.bicep' = {
   }
 }
 
+// ---- Data Collection Endpoint (Logs Ingestion API) ----
+module dce 'data-collection-endpoint.bicep' = {
+  name: 'data-collection-endpoint'
+  params: {
+    name: 'dce-${baseName}-${environment}'
+    location: location
+    tags: tags
+  }
+}
+
+// ---- Data Collection Rule – LoginInformation use case (sample) ----
+module dcrLoginInformation 'data-collection-rule.bicep' = {
+  name: 'dcr-login-information'
+  params: {
+    name: 'dcr-${baseName}-LoginInformation-${environment}'
+    location: location
+    dceResourceId: dce.outputs.dceResourceId
+    workspaceResourceId: logAnalytics.outputs.workspaceResourceId
+    tablePrefix: 'IntuneUp'
+    useCase: 'LoginInformation'
+    retentionDays: logRetentionDays
+    tags: tags
+  }
+}
+
 // Supporting storage accounts (for claim-check, password-expiry)
 resource stClaimCheck 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: 'st${baseName}cc${environment}'
@@ -185,7 +210,7 @@ module sbContainerApp 'container-app-sb.bicep' = {
   }
 }
 
-// ---- Step 3: RBAC (Container App MIs -> KV + App Config + Service Bus) ----
+// ---- Step 3: RBAC (Container App MIs -> KV + App Config + Service Bus + DCR) ----
 
 module rbac 'rbac-assignments.bicep' = {
   name: 'rbac-assignments'
@@ -202,6 +227,7 @@ module rbac 'rbac-assignments.bicep' = {
     sbFunctionPrincipalId: sbContainerApp.outputs.principalId
     automationAccountPrincipalId: ''
     httpStorageAccountName: 'st${baseName}cc${environment}'
+    dcrResourceId: dcrLoginInformation.outputs.dcrResourceId
   }
 }
 
@@ -212,13 +238,13 @@ module configSeed 'config-seed.bicep' = {
   params: {
     keyVaultName: keyVault.outputs.keyVaultName
     appConfigName: appConfig.outputs.appConfigName
-    serviceBusConnectionString: serviceBus.outputs.connectionString
-    logAnalyticsSharedKey: logAnalytics.outputs.primarySharedKey
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     serviceBusQueueName: serviceBus.outputs.queueName
     claimCheckStorageAccountName: 'st${baseName}cc${environment}'
     passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
     allowedIssuerThumbprints: allowedIssuerThumbprints
+    dceEndpoint: dce.outputs.dceEndpoint
+    dcrImmutableId: dcrLoginInformation.outputs.dcrImmutableId
   }
 }
 
@@ -233,3 +259,5 @@ output appInsightsInstrumentationKey string = appInsights.outputs.instrumentatio
 output containerRegistryLoginServer string = containerRegistry.properties.loginServer
 output httpContainerAppPrincipalId string = httpContainerApp.outputs.principalId
 output sbContainerAppPrincipalId string = sbContainerApp.outputs.principalId
+output dceEndpoint string = dce.outputs.dceEndpoint
+output dcrLoginInformationImmutableId string = dcrLoginInformation.outputs.dcrImmutableId

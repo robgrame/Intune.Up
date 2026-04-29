@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Azure.Monitor.Ingestion;
 using Azure.Storage.Blobs;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -28,9 +29,6 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-// HttpClient for Log Analytics Data Collector API
-builder.Services.AddHttpClient("LogAnalytics");
-
 // Helper: Get config value with fallback and validation
 static string GetConfigValue(IConfiguration config, string key, string? envVarName = null, string? defaultValue = null)
 {
@@ -51,8 +49,27 @@ static string GetConfigValue(IConfiguration config, string key, string? envVarNa
     return defaultValue ?? string.Empty;
 }
 
-// BlobServiceClient for claim-check pattern
+// Shared credential for all Azure SDK clients (Managed Identity in production)
 var defaultCredential = new DefaultAzureCredential();
+
+// LogsIngestionClient for the Logs Ingestion API (DCE + DCR, Entra ID authentication)
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetRequiredService<ILogger<Program>>();
+
+    var dceEndpoint = config["IntuneUp:LogAnalytics:DceEndpoint"];
+    if (string.IsNullOrWhiteSpace(dceEndpoint))
+    {
+        logger.LogError("LogsIngestionClient: IntuneUp:LogAnalytics:DceEndpoint is not configured");
+        throw new InvalidOperationException("IntuneUp:LogAnalytics:DceEndpoint must be configured");
+    }
+
+    logger.LogInformation("LogsIngestionClient: Using DCE endpoint {DceEndpoint}", dceEndpoint);
+    return new LogsIngestionClient(new Uri(dceEndpoint), defaultCredential);
+});
+
+// BlobServiceClient for claim-check pattern
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();

@@ -1,37 +1,50 @@
 // ============================================================
 // KQL Queries – IntuneUp Data Collection
 // Log Analytics Workspace
+//
+// NOTE: Migrated to Logs Ingestion API (DCR-based custom tables).
+// - Column names no longer carry _s/_d/_b type suffixes.
+// - Use-case-specific payload fields are under the 'Data' dynamic column:
+//   use parse_json(Data).FieldName to access them.
 // ============================================================
 
 // ---- 1. LOGIN INFORMATION – ultimi accessi per device ----
 // Mostra gli ultimi accessi registrati, ordinati per device
 IntuneUp_LoginInformation_CL
-| project TimeGenerated, DeviceName_s, DeviceId_s, UPN_s,
-          LastLoggedOnUser_s, LastLoggedOnDisplayName_s,
-          AzureAdJoined_b, DomainJoined_b, TenantName_s,
-          UptimeHours_d, LastBootTime_s
+| extend dev = parse_json(Data)
+| project TimeGenerated, DeviceName, UPN,
+          LastLoggedOnUser          = tostring(dev.LastLoggedOnUser),
+          LastLoggedOnDisplayName   = tostring(dev.LastLoggedOnDisplayName),
+          AzureAdJoined             = tobool(dev.AzureAdJoined),
+          DomainJoined              = tobool(dev.DomainJoined),
+          TenantName                = tostring(dev.TenantName),
+          UptimeHours               = toreal(dev.UptimeHours),
+          LastBootTime              = tostring(dev.LastBootTime)
 | sort by TimeGenerated desc
 
 
 // ---- 2. LOGIN INFORMATION – device non riavviati da >14 giorni ----
 IntuneUp_LoginInformation_CL
 | where TimeGenerated > ago(1d)
-| summarize arg_max(TimeGenerated, *) by DeviceName_s
-| where UptimeHours_d > 336   // 14 giorni * 24 ore
-| project DeviceName_s, UPN_s, UptimeHours_d,
-          UptimeDays = round(UptimeHours_d / 24, 1),
-          LastBootTime_s
-| sort by UptimeHours_d desc
+| extend dev = parse_json(Data)
+| extend UptimeHours = toreal(dev.UptimeHours)
+| summarize arg_max(TimeGenerated, *) by DeviceName
+| where UptimeHours > 336   // 14 giorni * 24 ore
+| project DeviceName, UPN, UptimeHours,
+          UptimeDays   = round(UptimeHours / 24, 1),
+          LastBootTime = tostring(parse_json(Data).LastBootTime)
+| sort by UptimeHours desc
 
 
 // ---- 3. LOGIN INFORMATION – distribuzione join type ----
 IntuneUp_LoginInformation_CL
 | where TimeGenerated > ago(1d)
-| summarize arg_max(TimeGenerated, *) by DeviceName_s
+| extend dev = parse_json(Data)
+| summarize arg_max(TimeGenerated, *) by DeviceName
 | extend JoinType = case(
-    AzureAdJoined_b == true and DomainJoined_b == true, "Hybrid (AAD + Domain)",
-    AzureAdJoined_b == true,  "Azure AD Only",
-    DomainJoined_b  == true,  "Domain Only",
+    tobool(dev.AzureAdJoined) == true and tobool(dev.DomainJoined) == true, "Hybrid (AAD + Domain)",
+    tobool(dev.AzureAdJoined) == true,  "Azure AD Only",
+    tobool(dev.DomainJoined)  == true,  "Domain Only",
     "Workgroup")
 | summarize DeviceCount = count() by JoinType
 | sort by DeviceCount desc
@@ -42,23 +55,24 @@ IntuneUp_LoginInformation_CL
 // tramite il collettore (es. aggiungere un collect.ps1 post-remediation)
 // Placeholder per quando sarà integrato:
 // IntuneUp_CleanupResult_CL
+// | extend dev = parse_json(Data)
 // | summarize
-//     TotalDeletedItems = sum(DeletedItems_d),
-//     TotalFreedMB      = sum(FreedMB_d),
-//     FailedItems       = sum(FailedItems_d)
-//   by bin(TimeGenerated, 1d), DeviceName_s
+//     TotalDeletedItems = sum(toint(dev.DeletedItems)),
+//     TotalFreedMB      = sum(toreal(dev.FreedMB)),
+//     FailedItems       = sum(toint(dev.FailedItems))
+//   by bin(TimeGenerated, 1d), DeviceName
 // | sort by TimeGenerated desc
 
 
 // ---- 5. EVENTI LOGON RECENTI – analisi tipo di logon ----
 IntuneUp_LoginInformation_CL
 | where TimeGenerated > ago(7d)
-| mv-expand RecentLogonEvents_s  // se serializzato come array JSON
-| extend event = parse_json(tostring(RecentLogonEvents_s))
+| extend dev = parse_json(Data)
+| mv-expand RecentLogonEvent = parse_json(tostring(dev.RecentLogonEvents))
 | extend
-    LogonTime    = todatetime(event.Time),
-    LogonType    = toint(event.LogonType),
-    AccountName  = tostring(event.AccountName)
+    LogonTime   = todatetime(RecentLogonEvent.Time),
+    LogonType   = toint(RecentLogonEvent.LogonType),
+    AccountName = tostring(RecentLogonEvent.AccountName)
 | extend LogonTypeLabel = case(
     LogonType == 2,  "Interactive",
     LogonType == 3,  "Network",
@@ -73,7 +87,7 @@ IntuneUp_LoginInformation_CL
 // ---- 6. HEARTBEAT – device attivi nelle ultime 24 ore ----
 IntuneUp_LoginInformation_CL
 | where TimeGenerated > ago(24h)
-| summarize LastSeen = max(TimeGenerated) by DeviceName_s, UPN_s
+| summarize LastSeen = max(TimeGenerated) by DeviceName, UPN
 | extend MinutesSinceLastSeen = datetime_diff('minute', now(), LastSeen)
 | sort by LastSeen desc
 
@@ -82,5 +96,7 @@ IntuneUp_LoginInformation_CL
 // Ipotizza che il server-side runbook loggi su Log Analytics
 IntuneUp_PasswordExpiryTrigger_CL
 | where TimeGenerated > ago(7d)
-| project TimeGenerated, DeviceName_s, UPN_s, DaysUntilExpiry_d
-| sort by DaysUntilExpiry_d asc
+| extend dev = parse_json(Data)
+| project TimeGenerated, DeviceName, UPN,
+          DaysUntilExpiry = toreal(dev.DaysUntilExpiry)
+| sort by DaysUntilExpiry asc
