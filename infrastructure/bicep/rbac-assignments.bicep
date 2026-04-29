@@ -120,9 +120,9 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
-// ---- Monitoring Metrics Publisher on DCR (SB Function writes via Logs Ingestion API) ----
+// ---- Data Collection Rule Data Sender (SB Function writes via Logs Ingestion API) ----
 // Required for the Logs Ingestion API (DCE + DCR), replacing the deprecated HTTP Data Collector API.
-var monitoringMetricsPublisherRoleId = '3913510d-42f4-4e42-8a64-420c390055eb'
+var dcrDataSenderRoleId = 'b01b39f6-e7c2-44a3-96c6-5b8c6b11da91'
 
 param dcrResourceId string = ''
 
@@ -130,11 +130,11 @@ resource dcrExisting 'Microsoft.Insights/dataCollectionRules@2023-03-11' existin
   name: last(split(dcrResourceId, '/'))
 }
 
-resource dcrMetricsPublisherRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(dcrResourceId)) {
-  name: guid(dcrResourceId, sbFunctionPrincipalId, monitoringMetricsPublisherRoleId)
+resource dcrDataSenderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(dcrResourceId)) {
+  name: guid(dcrResourceId, sbFunctionPrincipalId, dcrDataSenderRoleId)
   scope: dcrExisting
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringMetricsPublisherRoleId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', dcrDataSenderRoleId)
     principalId: sbFunctionPrincipalId
     principalType: 'ServicePrincipal'
   }

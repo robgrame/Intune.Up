@@ -32,11 +32,18 @@ function Send-LogsIngestionData {
     )
 
     # Acquire Managed Identity token for Azure Monitor ingestion scope
-    $tokenResponse = Invoke-RestMethod `
-        -Uri "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmonitor.azure.com%2F" `
-        -Headers @{ Metadata = "true" } `
-        -Method Get
-    $token = $tokenResponse.access_token
+    try {
+        $tokenResponse = Invoke-RestMethod `
+            -Uri "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmonitor.azure.com%2F" `
+            -Headers @{ Metadata = "true" } `
+            -Method Get
+        if ([string]::IsNullOrEmpty($tokenResponse.access_token)) {
+            throw "access_token is empty in IMDS response"
+        }
+        $token = $tokenResponse.access_token
+    } catch {
+        throw "Failed to acquire Managed Identity token for Azure Monitor: $($_.Exception.Message)"
+    }
 
     $uri = "${DceEndpoint}/dataCollectionRules/${DcrImmutableId}/streams/${StreamName}?api-version=2023-01-01"
     $headers = @{
