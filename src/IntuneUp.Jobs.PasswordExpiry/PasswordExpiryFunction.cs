@@ -43,6 +43,14 @@ public class PasswordExpiryFunction(
     // Table Storage batch limit
     private const int TableBatchSize = 100;
 
+    // Sharding: how many days each shard covers (non-overlapping time slices)
+    private static readonly int ShardSizeDays =
+        int.TryParse(Environment.GetEnvironmentVariable("IntuneUp__PasswordExpiry__ShardSizeDays"), out var sd) && sd > 0 ? sd : 1;
+
+    // Max concurrent shards to process in parallel (controls Graph API pressure)
+    private static readonly int MaxConcurrentShards =
+        int.TryParse(Environment.GetEnvironmentVariable("IntuneUp__PasswordExpiry__MaxConcurrentShards"), out var mc) && mc > 0 ? mc : 3;
+
     // Retry config for Graph throttling
     private const int MaxRetries = 5;
     private static readonly TimeSpan InitialBackoff = TimeSpan.FromSeconds(5);
@@ -87,13 +95,70 @@ public class PasswordExpiryFunction(
         DateTimeOffset filterEnd,
         CancellationToken ct)
     {
+        // Build non-overlapping shards: each shard covers [shardStart, shardEnd)
+        // Last shard uses inclusive end to avoid missing boundary records
+        var shards = BuildShards(filterStart, filterEnd);
+        logger.LogInformation("Shredding query into {Count} shards of ~{Days} day(s) each, max {Concurrency} concurrent",
+            shards.Count, ShardSizeDays, MaxConcurrentShards);
+
+        var totalWritten = 0;
+        using var semaphore = new SemaphoreSlim(MaxConcurrentShards);
+
+        var tasks = shards.Select(async (shard, index) =>
+        {
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                var written = await ProcessShardAsync(shard.Start, shard.End, shard.IsLast, tableClient, now, targetDate, index, ct);
+                Interlocked.Add(ref totalWritten, written);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+
+        logger.LogInformation("All shards complete. Total records written: {Total}", totalWritten);
+        return totalWritten;
+    }
+
+    private List<(DateTimeOffset Start, DateTimeOffset End, bool IsLast)> BuildShards(
+        DateTimeOffset filterStart, DateTimeOffset filterEnd)
+    {
+        var shards = new List<(DateTimeOffset Start, DateTimeOffset End, bool IsLast)>();
+        var current = filterStart;
+
+        while (current < filterEnd)
+        {
+            var shardEnd = current.AddDays(ShardSizeDays);
+            var isLast = shardEnd >= filterEnd;
+            shards.Add((current, isLast ? filterEnd : shardEnd, isLast));
+            current = shardEnd;
+        }
+
+        return shards;
+    }
+
+    private async Task<int> ProcessShardAsync(
+        DateTimeOffset shardStart,
+        DateTimeOffset shardEnd,
+        bool isLast,
+        TableClient tableClient,
+        DateTimeOffset now,
+        DateTimeOffset targetDate,
+        int shardIndex,
+        CancellationToken ct)
+    {
+        // Non-overlapping boundary: [shardStart, shardEnd) for all but last; [shardStart, shardEnd] for last
+        var endOperator = isLast ? "le" : "lt";
+        var graphFilter = $"accountEnabled eq true and lastPasswordChangeDateTime ge {shardStart:yyyy-MM-ddTHH:mm:ssZ} and lastPasswordChangeDateTime {endOperator} {shardEnd:yyyy-MM-ddTHH:mm:ssZ}";
+
+        logger.LogInformation("Shard {Index}: {Filter}", shardIndex, graphFilter);
+
         var written = 0;
         var pagesProcessed = 0;
-
-        // Graph filter: accountEnabled eq true AND lastPasswordChangeDateTime in range
-        var graphFilter = $"accountEnabled eq true and lastPasswordChangeDateTime ge {filterStart:yyyy-MM-ddTHH:mm:ssZ} and lastPasswordChangeDateTime le {filterEnd:yyyy-MM-ddTHH:mm:ssZ}";
-
-        logger.LogInformation("Graph filter: {Filter}", graphFilter);
 
         var usersResponse = await ExecuteWithRetryAsync(
             () => graphClient.Users.GetAsync(req =>
@@ -107,14 +172,12 @@ public class PasswordExpiryFunction(
 
         if (usersResponse?.OdataCount.HasValue == true)
         {
-            logger.LogInformation("Graph reports {Count} total matching users", usersResponse.OdataCount.Value);
+            logger.LogInformation("Shard {Index}: Graph reports {Count} matching users", shardIndex, usersResponse.OdataCount.Value);
         }
 
-        // Process first page
         pagesProcessed++;
         written += await ProcessUsersPageAsync(usersResponse?.Value, tableClient, now, targetDate, ct);
 
-        // Process subsequent pages
         var nextLink = usersResponse?.OdataNextLink;
         while (!string.IsNullOrEmpty(nextLink))
         {
@@ -126,17 +189,15 @@ public class PasswordExpiryFunction(
             pagesProcessed++;
             if (pagesProcessed % 50 == 0)
             {
-                logger.LogInformation("Processed {Pages} pages, {Written} records written so far", pagesProcessed, written);
+                logger.LogInformation("Shard {Index}: processed {Pages} pages, {Written} records so far",
+                    shardIndex, pagesProcessed, written);
             }
 
             written += await ProcessUsersPageAsync(nextPage?.Value, tableClient, now, targetDate, ct);
-
             nextLink = nextPage?.OdataNextLink;
         }
 
-        // Flush handled inside ProcessUsersPageAsync per page
-
-        logger.LogInformation("Processed {Pages} total Graph pages", pagesProcessed);
+        logger.LogInformation("Shard {Index}: complete. Pages={Pages}, Written={Written}", shardIndex, pagesProcessed, written);
         return written;
     }
 
