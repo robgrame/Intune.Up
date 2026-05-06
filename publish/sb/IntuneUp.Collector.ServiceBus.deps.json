@@ -6,14 +6,14 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "IntuneUp.Collector.ServiceBus/1.0.0": {
+      "IntuneUp.Collector.ServiceBus/1.1.4": {
         "dependencies": {
           "Azure.Identity": "1.21.0",
           "Azure.Messaging.ServiceBus": "7.20.1",
           "Azure.Monitor.Ingestion": "1.2.0",
           "Azure.Security.KeyVault.Secrets": "4.10.0",
           "Azure.Storage.Blobs": "12.27.0",
-          "IntuneUp.Common": "1.0.0",
+          "IntuneUp.Common": "1.1.4",
           "Microsoft.ApplicationInsights.WorkerService": "2.23.0",
           "Microsoft.Azure.Functions.Worker": "2.51.0",
           "Microsoft.Azure.Functions.Worker.ApplicationInsights": "2.50.0",
@@ -650,18 +650,18 @@
           }
         }
       },
-      "IntuneUp.Common/1.0.0": {
+      "IntuneUp.Common/1.1.4": {
         "runtime": {
           "IntuneUp.Common.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
+            "assemblyVersion": "1.1.4.0",
+            "fileVersion": "1.1.4.0"
           }
         }
       }
     }
   },
   "libraries": {
-    "IntuneUp.Collector.ServiceBus/1.0.0": {
+    "IntuneUp.Collector.ServiceBus/1.1.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -1030,7 +1030,7 @@
       "path": "system.windows.extensions/6.0.0",
       "hashPath": "system.windows.extensions.6.0.0.nupkg.sha512"
     },
-    "IntuneUp.Common/1.0.0": {
+    "IntuneUp.Common/1.1.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

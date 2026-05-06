@@ -12,8 +12,8 @@
         "name": "message",
         "direction": "In",
         "type": "serviceBusTrigger",
-        "queueName": "%IntuneUp__ServiceBus__QueueName%",
-        "connection": "IntuneUp__ServiceBus__Connection",
+        "queueName": "%ServiceBusQueueName%",
+        "connection": "ServiceBusConnection",
         "cardinality": "One",
         "properties": {
           "supportsDeferredBinding": "True"

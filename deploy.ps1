@@ -43,7 +43,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('dev','test','prod')]
+    [ValidateSet('dev','dev2','test','prod')]
     [string]$Environment = 'dev',
 
     [string]$Location = 'westeurope',
@@ -55,6 +55,10 @@ param(
     [string]$SubscriptionId = '',
 
     [string]$AllowedIssuerThumbprints = '',
+
+    [switch]$DeployApim,
+    [switch]$DeployTimerFunction,
+    [switch]$NoAutomationAccount,
 
     [switch]$SkipBuild,
     [switch]$SkipBicep,
@@ -87,13 +91,17 @@ $BicepDir    = Join-Path $RepoRoot 'infrastructure\bicep'
 $PublishDir  = Join-Path $RepoRoot 'publish'
 $HttpProj    = Join-Path $SrcDir 'IntuneUp.Collector.Http\IntuneUp.Collector.Http.csproj'
 $SbProj      = Join-Path $SrcDir 'IntuneUp.Collector.ServiceBus\IntuneUp.Collector.ServiceBus.csproj'
+$TimerProj   = Join-Path $SrcDir 'IntuneUp.Jobs.PasswordExpiry\IntuneUp.Jobs.PasswordExpiry.csproj'
 $HttpOut     = Join-Path $PublishDir 'http'
 $SbOut       = Join-Path $PublishDir 'sb'
+$TimerOut    = Join-Path $PublishDir 'timer'
 $HttpZip     = Join-Path $PublishDir 'http.zip'
 $SbZip       = Join-Path $PublishDir 'sb.zip'
+$TimerZip    = Join-Path $PublishDir 'timer.zip'
 $MainBicep   = Join-Path $BicepDir 'main.bicep'
 $FuncHttp    = "func-$BaseName-http-$Environment"
 $FuncSb      = "func-$BaseName-sb-$Environment"
+$FuncTimer   = "func-$BaseName-timer-$Environment"
 $AAName      = "aa-$BaseName-$Environment"
 $ScriptVersion = (Get-Content (Join-Path $RepoRoot 'VERSION') -ErrorAction SilentlyContinue).Trim()
 
@@ -189,20 +197,31 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { Write-Fail 'Publish SB failed.' }
     Write-Ok "Published to $SbOut"
 
+    Write-Step 'Publishing Timer function (PasswordExpiry)'
+    if (Test-Path $TimerOut) { Remove-Item $TimerOut -Recurse -Force }
+    dotnet publish $TimerProj -c Release -o $TimerOut --no-build --nologo
+    if ($LASTEXITCODE -ne 0) { Write-Fail 'Publish Timer failed.' }
+    Write-Ok "Published to $TimerOut"
+
     Write-Step 'Creating ZIP packages'
-    if (Test-Path $HttpZip) { Remove-Item $HttpZip -Force }
-    if (Test-Path $SbZip)   { Remove-Item $SbZip -Force }
-    Compress-Archive -Path "$HttpOut\*" -DestinationPath $HttpZip
-    Compress-Archive -Path "$SbOut\*"   -DestinationPath $SbZip
-    $httpMB = [math]::Round((Get-Item $HttpZip).Length / 1MB, 1)
-    $sbMB   = [math]::Round((Get-Item $SbZip).Length   / 1MB, 1)
-    Write-Ok "http.zip: ${httpMB} MB"
-    Write-Ok "sb.zip  : ${sbMB} MB"
+    if (Test-Path $HttpZip)  { Remove-Item $HttpZip -Force }
+    if (Test-Path $SbZip)    { Remove-Item $SbZip -Force }
+    if (Test-Path $TimerZip) { Remove-Item $TimerZip -Force }
+    Compress-Archive -Path "$HttpOut\*"  -DestinationPath $HttpZip
+    Compress-Archive -Path "$SbOut\*"    -DestinationPath $SbZip
+    Compress-Archive -Path "$TimerOut\*" -DestinationPath $TimerZip
+    $httpMB  = [math]::Round((Get-Item $HttpZip).Length / 1MB, 1)
+    $sbMB    = [math]::Round((Get-Item $SbZip).Length   / 1MB, 1)
+    $timerMB = [math]::Round((Get-Item $TimerZip).Length / 1MB, 1)
+    Write-Ok "http.zip : ${httpMB} MB"
+    Write-Ok "sb.zip   : ${sbMB} MB"
+    Write-Ok "timer.zip: ${timerMB} MB"
 
 } else {
     Write-Warn 'SkipBuild: using existing publish/ output'
-    if (-not (Test-Path $HttpZip)) { Write-Fail 'http.zip not found. Run without -SkipBuild first.' }
-    if (-not (Test-Path $SbZip))   { Write-Fail 'sb.zip not found. Run without -SkipBuild first.' }
+    if (-not (Test-Path $HttpZip))  { Write-Fail 'http.zip not found. Run without -SkipBuild first.' }
+    if (-not (Test-Path $SbZip))    { Write-Fail 'sb.zip not found. Run without -SkipBuild first.' }
+    if (-not (Test-Path $TimerZip)) { Write-Fail 'timer.zip not found. Run without -SkipBuild first.' }
     Write-Ok 'Existing ZIPs found'
 }
 
@@ -215,6 +234,10 @@ if (-not $SkipBicep) {
     Write-Host "  Template: $MainBicep"
     Write-Host "  Location: $Location"
 
+    $bicepDeployApim = if ($DeployApim) { 'true' } else { 'false' }
+    $bicepDeployTimer = if ($DeployTimerFunction) { 'true' } else { 'false' }
+    $bicepDeployAA = if ($NoAutomationAccount) { 'false' } else { 'true' }
+
     az deployment group create `
         --resource-group $ResourceGroup `
         --template-file  $MainBicep `
@@ -222,6 +245,9 @@ if (-not $SkipBicep) {
                          baseName=$BaseName `
                          location=$Location `
                          allowedIssuerThumbprints=$AllowedIssuerThumbprints `
+                         deployApim=$bicepDeployApim `
+                         deployTimerFunction=$bicepDeployTimer `
+                         deployAutomationAccount=$bicepDeployAA `
         @subParam `
         --output table
 
@@ -282,6 +308,13 @@ if (-not $SkipFunctionDeploy) {
         Write-Fail "SB function deploy failed after retries."
     }
     Write-Ok "$FuncSb deployed"
+
+    Write-Step "Deploying Timer function: $FuncTimer"
+    if (-not (Deploy-FunctionZip -RG $ResourceGroup -AppName $FuncTimer -ZipPath $TimerZip)) {
+        Write-Warn "Timer function deploy failed (may not exist if deployTimerFunction=false in Bicep)."
+    } else {
+        Write-Ok "$FuncTimer deployed"
+    }
 
 } else {
     Write-Warn 'SkipFunctionDeploy: function app deployment skipped'
