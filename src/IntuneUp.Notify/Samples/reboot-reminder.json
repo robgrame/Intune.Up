@@ -1,0 +1,9 @@
+{
+  "title": "System Maintenance",
+  "body": "A system restart is required to complete updates.\n\nPlease save your work and restart your computer within the next hour.",
+  "icon": "Info",
+  "buttons": "OkSnooze",
+  "timeoutSeconds": 600,
+  "organization": "Contoso Ltd",
+  "topmost": false
+}
