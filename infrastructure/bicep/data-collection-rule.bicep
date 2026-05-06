@@ -88,7 +88,7 @@ resource dcr 'Microsoft.Insights/dataCollectionRules@2023-03-11' = {
         streams: [ streamName ]
         destinations: [ 'la-destination' ]
         outputStream: streamName
-        transformKql: 'source | extend TimeGenerated = coalesce(todatetime(ReceivedAt), now())'
+        transformKql: 'source | extend TimeGenerated = iif(isempty(ReceivedAt), now(), todatetime(ReceivedAt))'
       }
     ]
   }

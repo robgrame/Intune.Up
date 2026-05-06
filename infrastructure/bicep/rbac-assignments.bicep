@@ -120,9 +120,10 @@ resource laContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
-// ---- Data Collection Rule Data Sender (SB Function writes via Logs Ingestion API) ----
+// ---- Monitoring Metrics Publisher (SB Function writes via Logs Ingestion API) ----
 // Required for the Logs Ingestion API (DCE + DCR), replacing the deprecated HTTP Data Collector API.
-var dcrDataSenderRoleId = 'b01b39f6-e7c2-44a3-96c6-5b8c6b11da91'
+// Correct built-in role: "Monitoring Metrics Publisher" (3913510d-42f4-4e42-8a64-420c390055eb)
+var dcrDataSenderRoleId = '3913510d-42f4-4e42-8a64-420c390055eb'
 
 param dcrResourceIds array = []
 
