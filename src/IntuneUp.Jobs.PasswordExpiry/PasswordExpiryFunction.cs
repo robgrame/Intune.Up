@@ -6,6 +6,7 @@ using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Kiota.Abstractions;
 using System.Net;
+using System.Text.RegularExpressions;
 
 namespace IntuneUp.Jobs.PasswordExpiry;
 
@@ -55,14 +56,28 @@ public class PasswordExpiryFunction(
     private const int MaxRetries = 5;
     private static readonly TimeSpan InitialBackoff = TimeSpan.FromSeconds(5);
 
+    // UPN regex filters (evaluated client-side after Graph returns results)
+    // Include: only UPNs matching this pattern are processed (null = all included)
+    // Exclude: UPNs matching this pattern are skipped (applied after include)
+    private static readonly Regex? UpnIncludePattern = CreateRegex(
+        Environment.GetEnvironmentVariable("IntuneUp__PasswordExpiry__UpnIncludePattern"));
+
+    private static readonly Regex? UpnExcludePattern = CreateRegex(
+        Environment.GetEnvironmentVariable("IntuneUp__PasswordExpiry__UpnExcludePattern"));
+
+    private static Regex? CreateRegex(string? pattern) =>
+        string.IsNullOrWhiteSpace(pattern) ? null : new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     [Function("WritePasswordExpiryTriggers")]
     public async Task RunAsync(
         [TimerTrigger("0 0 6 * * *")] TimerInfo timerInfo,
         CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "PasswordExpiry job started. MaxAgeDays={MaxAge}, ThresholdDays={Threshold}, Table={Table}",
-            MaxPasswordAgeDays, ThresholdDays, TableName);
+            "PasswordExpiry job started. MaxAgeDays={MaxAge}, ThresholdDays={Threshold}, Table={Table}, UpnInclude={Include}, UpnExclude={Exclude}",
+            MaxPasswordAgeDays, ThresholdDays, TableName,
+            UpnIncludePattern?.ToString() ?? "(none)",
+            UpnExcludePattern?.ToString() ?? "(none)");
 
         var tableClient = tableServiceClient.GetTableClient(TableName);
         await tableClient.CreateIfNotExistsAsync(cancellationToken);
@@ -216,6 +231,12 @@ public class PasswordExpiryFunction(
         foreach (var user in users)
         {
             if (user.LastPasswordChangeDateTime is null || string.IsNullOrEmpty(user.UserPrincipalName))
+                continue;
+
+            // Apply UPN regex filters
+            if (UpnIncludePattern is not null && !UpnIncludePattern.IsMatch(user.UserPrincipalName))
+                continue;
+            if (UpnExcludePattern is not null && UpnExcludePattern.IsMatch(user.UserPrincipalName))
                 continue;
 
             var expiryDate = user.LastPasswordChangeDateTime.Value.AddDays(MaxPasswordAgeDays);
