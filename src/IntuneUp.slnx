@@ -2,4 +2,5 @@
   <Project Path="IntuneUp.Collector.Http/IntuneUp.Collector.Http.csproj" />
   <Project Path="IntuneUp.Collector.ServiceBus/IntuneUp.Collector.ServiceBus.csproj" />
   <Project Path="IntuneUp.Common/IntuneUp.Common.csproj" />
+  <Project Path="IntuneUp.Jobs.PasswordExpiry/IntuneUp.Jobs.PasswordExpiry.csproj" />
 </Solution>

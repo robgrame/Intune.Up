@@ -171,3 +171,16 @@ resource httpFuncTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
     principalType: 'ServicePrincipal'
   }
 }
+
+// Timer Function → Table Storage (writes password expiry records, replacing Automation runbook)
+param timerFunctionPrincipalId string = ''
+
+resource timerFuncTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(timerFunctionPrincipalId) && !empty(passwordExpiryStorageAccountName)) {
+  name: guid(pwdExpiryStorage.id, timerFunctionPrincipalId, storageTableDataContributorRoleId)
+  scope: pwdExpiryStorage
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: timerFunctionPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}

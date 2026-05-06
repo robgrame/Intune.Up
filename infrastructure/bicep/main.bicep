@@ -18,8 +18,8 @@ param baseName string = 'intuneup'
 @description('Azure region for all resources')
 param location string = resourceGroup().location
 
-@description('Environment tag: dev, test, prod')
-@allowed(['dev', 'test', 'prod'])
+@description('Environment tag: dev, dev2, test, prod')
+@allowed(['dev', 'dev2', 'test', 'prod'])
 param environment string = 'dev'
 
 @description('Log Analytics retention in days')
@@ -30,6 +30,15 @@ param logRetentionDays int = 90
 @description('Comma-separated list of allowed issuer/CA certificate thumbprints (any cert signed by these CAs is accepted)')
 @secure()
 param allowedIssuerThumbprints string = ''
+
+@description('Deploy API Management gateway in front of HTTP Function')
+param deployApim bool = true
+
+@description('Deploy Azure Automation Account (legacy runbook approach)')
+param deployAutomationAccount bool = true
+
+@description('Deploy Timer Function for password expiry job (replaces Automation runbook)')
+param deployTimerFunction bool = true
 
 var tags = {
   project: 'IntuneUp'
@@ -80,7 +89,7 @@ module appConfig 'app-configuration.bicep' = {
   }
 }
 
-module automationAccount 'automation-account.bicep' = {
+module automationAccount 'automation-account.bicep' = if (deployAutomationAccount) {
   name: 'automation-account'
   params: {
     name: 'aa-${baseName}-${environment}'
@@ -247,6 +256,63 @@ module functionSb 'function-app.bicep' = {
   }
 }
 
+// ---- Step 2b: API Management (gateway in front of HTTP Function) ----
+
+module apim 'api-management.bicep' = if (deployApim) {
+  name: 'api-management'
+  params: {
+    name: 'apim-${baseName}-${environment}'
+    location: location
+    tags: tags
+    publisherEmail: 'admin@intune-up.local'
+    publisherName: 'IntuneUp'
+    backendFunctionHostname: functionHttp.outputs.functionAppName == '' ? '' : '${functionHttp.outputs.functionAppName}.azurewebsites.net'
+  }
+}
+
+// ---- Step 2c: Timer Function (replaces Automation runbook for password expiry) ----
+
+module functionTimer 'function-app.bicep' = if (deployTimerFunction) {
+  name: 'function-timer'
+  params: {
+    name: 'func-${baseName}-timer-${environment}'
+    storageAccountName: 'st${baseName}tmr${environment}'
+    location: location
+    tags: tags
+    keyVaultUri: keyVault.outputs.keyVaultUri
+    extraAppSettings: [
+      {
+        name: 'APPCONFIG_ENDPOINT'
+        value: appConfig.outputs.appConfigEndpoint
+      }
+      {
+        name: 'IntuneUp__PasswordExpiry__StorageAccountName'
+        value: 'st${baseName}pe${environment}'
+      }
+      {
+        name: 'IntuneUp__PasswordExpiry__TableName'
+        value: 'PasswordExpiry'
+      }
+      {
+        name: 'IntuneUp__PasswordExpiry__MaxAgeDays'
+        value: '90'
+      }
+      {
+        name: 'IntuneUp__PasswordExpiry__ThresholdDays'
+        value: '10'
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.outputs.connectionString
+      }
+      {
+        name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
+        value: '~3'
+      }
+    ]
+  }
+}
+
 // ---- Step 3: RBAC (Function App MIs + Automation Account -> KV + App Config + Service Bus + Storage + DCR) ----
 
 module rbac 'rbac-assignments.bicep' = {
@@ -256,20 +322,20 @@ module rbac 'rbac-assignments.bicep' = {
     appConfigName: appConfig.outputs.appConfigName
     serviceBusNamespaceName: serviceBus.outputs.namespaceName
     logAnalyticsWorkspaceName: 'law-${baseName}-${environment}'
-    principalIds: [
+    principalIds: concat([
       functionHttp.outputs.principalId
       functionSb.outputs.principalId
-      automationAccount.outputs.principalId
-    ]
+    ], deployAutomationAccount ? [automationAccount.outputs.principalId] : [], deployTimerFunction ? [functionTimer.outputs.principalId] : [])
     httpFunctionPrincipalId: functionHttp.outputs.principalId
     sbFunctionPrincipalId: functionSb.outputs.principalId
-    automationAccountPrincipalId: automationAccount.outputs.principalId
+    automationAccountPrincipalId: deployAutomationAccount ? automationAccount.outputs.principalId : ''
     httpStorageAccountName: 'st${baseName}http${environment}'
     passwordExpiryStorageAccountName: 'st${baseName}pe${environment}'
     dcrResourceIds: [
       dcrLoginInformation.outputs.dcrResourceId
       dcrPasswordExpiryTrigger.outputs.dcrResourceId
     ]
+    timerFunctionPrincipalId: deployTimerFunction ? functionTimer.outputs.principalId : ''
   }
 }
 
@@ -299,9 +365,11 @@ output httpFunctionUrl string = functionHttp.outputs.functionUrl
 output serviceBusNamespace string = serviceBus.outputs.namespaceName
 output keyVaultName string = keyVault.outputs.keyVaultName
 output appConfigEndpoint string = appConfig.outputs.appConfigEndpoint
-output automationAccountName string = automationAccount.outputs.automationAccountName
+output automationAccountName string = deployAutomationAccount ? automationAccount.outputs.automationAccountName : ''
 output appInsightsName string = appInsights.outputs.appInsightsName
 output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey
 output dceEndpoint string = dce.outputs.dceEndpoint
 output dcrLoginInformationImmutableId string = dcrLoginInformation.outputs.dcrImmutableId
 output dcrPasswordExpiryTriggerImmutableId string = dcrPasswordExpiryTrigger.outputs.dcrImmutableId
+output apimGatewayUrl string = deployApim ? apim.outputs.apimGatewayUrl : ''
+output timerFunctionName string = deployTimerFunction ? functionTimer.outputs.functionAppName : ''

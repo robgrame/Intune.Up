@@ -6,14 +6,15 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "IntuneUp.Collector.Http/1.0.0": {
+      "IntuneUp.Collector.Http/1.1.4": {
         "dependencies": {
           "Azure.Data.Tables": "12.11.0",
           "Azure.Identity": "1.21.0",
           "Azure.Messaging.ServiceBus": "7.20.1",
+          "Azure.Monitor.OpenTelemetry.Exporter": "1.2.0",
           "Azure.Security.KeyVault.Secrets": "4.10.0",
           "Azure.Storage.Blobs": "12.27.0",
-          "IntuneUp.Common": "1.0.0",
+          "IntuneUp.Common": "1.1.4",
           "Microsoft.ApplicationInsights.WorkerService": "2.23.0",
           "Microsoft.Azure.Functions.Worker": "2.51.0",
           "Microsoft.Azure.Functions.Worker.ApplicationInsights": "2.50.0",
@@ -117,6 +118,19 @@
           "lib/net8.0/Azure.Messaging.ServiceBus.dll": {
             "assemblyVersion": "7.20.1.0",
             "fileVersion": "7.2000.125.31203"
+          }
+        }
+      },
+      "Azure.Monitor.OpenTelemetry.Exporter/1.2.0": {
+        "dependencies": {
+          "Azure.Core": "1.53.0",
+          "OpenTelemetry": "1.7.0",
+          "OpenTelemetry.PersistentStorage.FileSystem": "1.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/Azure.Monitor.OpenTelemetry.Exporter.dll": {
+            "assemblyVersion": "1.2.0.0",
+            "fileVersion": "1.200.24.7403"
           }
         }
       },
@@ -490,6 +504,55 @@
           }
         }
       },
+      "OpenTelemetry/1.7.0": {
+        "dependencies": {
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "1.7.0"
+        },
+        "runtime": {
+          "lib/net8.0/OpenTelemetry.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.7.0.1106"
+          }
+        }
+      },
+      "OpenTelemetry.Api/1.7.0": {
+        "runtime": {
+          "lib/net8.0/OpenTelemetry.Api.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.7.0.1106"
+          }
+        }
+      },
+      "OpenTelemetry.Api.ProviderBuilderExtensions/1.7.0": {
+        "dependencies": {
+          "OpenTelemetry.Api": "1.7.0"
+        },
+        "runtime": {
+          "lib/net8.0/OpenTelemetry.Api.ProviderBuilderExtensions.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.7.0.1106"
+          }
+        }
+      },
+      "OpenTelemetry.PersistentStorage.Abstractions/1.0.0": {
+        "runtime": {
+          "lib/netstandard2.0/OpenTelemetry.PersistentStorage.Abstractions.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "OpenTelemetry.PersistentStorage.FileSystem/1.0.0": {
+        "dependencies": {
+          "OpenTelemetry.PersistentStorage.Abstractions": "1.0.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/OpenTelemetry.PersistentStorage.FileSystem.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
       "System.ClientModel/1.10.0": {
         "dependencies": {
           "System.Memory.Data": "10.0.3"
@@ -619,18 +682,18 @@
           }
         }
       },
-      "IntuneUp.Common/1.0.0": {
+      "IntuneUp.Common/1.1.4": {
         "runtime": {
           "IntuneUp.Common.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
+            "assemblyVersion": "1.1.4.0",
+            "fileVersion": "1.1.4.0"
           }
         }
       }
     }
   },
   "libraries": {
-    "IntuneUp.Collector.Http/1.0.0": {
+    "IntuneUp.Collector.Http/1.1.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -690,6 +753,13 @@
       "sha512": "sha512-DxCkedWPQuiXrIyFcriOhsQcZmDZW+j9d55Ev4nnK3yjMUFjlVe4Hj37fuZTJlNhC3P+7EumqBTt33R6DfOxGA==",
       "path": "azure.messaging.servicebus/7.20.1",
       "hashPath": "azure.messaging.servicebus.7.20.1.nupkg.sha512"
+    },
+    "Azure.Monitor.OpenTelemetry.Exporter/1.2.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-dxjmDrdzujv0UK6Sixqr/tonyDc0mQUjNuMGYjGuUJZtiQBdiQcXkI9pEm9ErdaJsfqmA6c3pvDnw3nTxJZJOA==",
+      "path": "azure.monitor.opentelemetry.exporter/1.2.0",
+      "hashPath": "azure.monitor.opentelemetry.exporter.1.2.0.nupkg.sha512"
     },
     "Azure.Security.KeyVault.Secrets/4.10.0": {
       "type": "package",
@@ -922,6 +992,41 @@
       "path": "microsoft.win32.systemevents/6.0.0",
       "hashPath": "microsoft.win32.systemevents.6.0.0.nupkg.sha512"
     },
+    "OpenTelemetry/1.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-HNmOJg++4FtEJGCIn1dCJcDkHRLNuLKU047owrGXUOfz/C/c5oZHOPKrowKVOy2jOOh/F9+HDshzeOk5NnQEZg==",
+      "path": "opentelemetry/1.7.0",
+      "hashPath": "opentelemetry.1.7.0.nupkg.sha512"
+    },
+    "OpenTelemetry.Api/1.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-w5uDHl1Nm7R5igWu1QjewpdPzJSavua8NTI3+iThOdRNHD3cabox8JeIJ8LpBSXGHARSNFMJZ/Xr5EGRinMTMg==",
+      "path": "opentelemetry.api/1.7.0",
+      "hashPath": "opentelemetry.api.1.7.0.nupkg.sha512"
+    },
+    "OpenTelemetry.Api.ProviderBuilderExtensions/1.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-fHLmJcRJk1dAwddjBgvqi/Grmr04hPo1DoFwTa6hxtSvAFOXPU56Xe9Sh2VXqz6Gstzp6TCju8z0Sob1t7BzSg==",
+      "path": "opentelemetry.api.providerbuilderextensions/1.7.0",
+      "hashPath": "opentelemetry.api.providerbuilderextensions.1.7.0.nupkg.sha512"
+    },
+    "OpenTelemetry.PersistentStorage.Abstractions/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-7ZtgGFPCovixOwJ+azTsMTkadM5u1SPYRKOXqYz0jWNbrzVGJmvktLr7eS4ncwcve86BW9nAZW++vjdfIXyt7g==",
+      "path": "opentelemetry.persistentstorage.abstractions/1.0.0",
+      "hashPath": "opentelemetry.persistentstorage.abstractions.1.0.0.nupkg.sha512"
+    },
+    "OpenTelemetry.PersistentStorage.FileSystem/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-MBz/D9Lo2tKfVMmk5tPVQ1RwiWL+if4b6wv7KJOeBmio5lv0twRLAQxkBHfnLpcf66oWAQS6AaFykmn1Atww1Q==",
+      "path": "opentelemetry.persistentstorage.filesystem/1.0.0",
+      "hashPath": "opentelemetry.persistentstorage.filesystem.1.0.0.nupkg.sha512"
+    },
     "System.ClientModel/1.10.0": {
       "type": "package",
       "serviceable": true,
@@ -985,7 +1090,7 @@
       "path": "system.windows.extensions/6.0.0",
       "hashPath": "system.windows.extensions.6.0.0.nupkg.sha512"
     },
-    "IntuneUp.Common/1.0.0": {
+    "IntuneUp.Common/1.1.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
