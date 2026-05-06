@@ -1,0 +1,10 @@
+{
+  "title": "Device Compliance",
+  "subtitle": "Your device is not compliant",
+  "body": "Your device does not meet the organization's security requirements.\n\nPlease ensure:\n• Windows Update is current\n• BitLocker is enabled\n• Antivirus definitions are up to date\n\nYou have 24 hours to remediate before access is restricted.",
+  "icon": "Shield",
+  "buttons": "Ok",
+  "timeoutSeconds": 0,
+  "organization": "Contoso Ltd",
+  "topmost": true
+}
